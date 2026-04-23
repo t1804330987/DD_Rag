@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: dd-rag
+  profiles:
+    active: dev
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB

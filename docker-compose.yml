@@ -1,0 +1,163 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: dd-rag-postgres
+    environment:
+      POSTGRES_DB: dd_rag
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: 123456
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d dd_rag"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  elasticsearch:
+    build:
+      context: .
+      dockerfile: docker/elasticsearch/Dockerfile
+    container_name: dd-rag-elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: dd-rag-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: dd-rag-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  ollama-model-init:
+    image: ollama/ollama:latest
+    container_name: dd-rag-ollama-model-init
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        echo "Waiting for Ollama service..."
+        until ollama list >/dev/null 2>&1; do
+          sleep 2
+        done
+        echo "Pulling model qllama/bge-small-zh-v1.5..."
+        ollama pull qllama/bge-small-zh-v1.5
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  backend:
+    image: maven:3.9.9-eclipse-temurin-21
+    container_name: dd-rag-backend
+    working_dir: /workspace
+    command: >
+      sh -c "mvn -q -Dmaven.test.skip=true spring-boot:run"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:?set DASHSCOPE_API_KEY in your shell or .env}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dd_rag
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 123456
+      STORAGE_MINIO_ENDPOINT: http://minio:9000
+      STORAGE_MINIO_ACCESS_KEY: minioadmin
+      STORAGE_MINIO_SECRET_KEY: minioadmin
+      STORAGE_MINIO_BUCKET: dd-rag-documents
+      SPRING_AI_OLLAMA_BASE_URL: http://ollama:11434
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: 9200
+      ELASTICSEARCH_SCHEME: http
+      DD_RAG_JWT_SECRET: dd-rag-dev-jwt-secret-2026-04-20-32bytes
+      MAVEN_OPTS: -Dfile.encoding=UTF-8
+    ports:
+      - "${BACKEND_PORT:-18080}:8080"
+    volumes:
+      - ./:/workspace
+      - maven-repo:/root/.m2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ollama-model-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+  frontend:
+    image: node:22-alpine
+    container_name: dd-rag-frontend
+    working_dir: /workspace/frontend
+    command: >
+      sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      VITE_API_BASE_URL: http://backend:8080
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./:/workspace
+      - frontend-node-modules:/workspace/frontend/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  elasticvue:
+    image: cars10/elasticvue:latest
+    container_name: dd-rag-elasticvue
+    ports:
+      - "8088:8080"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  elasticsearch-data:
+  minio-data:
+  ollama-data:
+  maven-repo:
+  frontend-node-modules:
