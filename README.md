@@ -293,6 +293,12 @@ MinIO：http://localhost:9001
 Elasticvue：http://localhost:8088
 ```
 
+线上域名：
+
+```text
+http://www.ddrag.top
+```
+
 ### 3. 双机部署
 
 双机部署适合小内存服务器：
@@ -336,9 +342,6 @@ DD_Rag
 - `docs/PROJECT_READING_GUIDE.md`：项目代码阅读路线。
 - `docs/GITHUB_PUBLISH_GUIDE.md`：GitHub clean 快照发布流程。
 - `docs/DEPLOYMENT_RECORD.md`：部署记录。
-- `docs/DEBUG_NOTES.md`：问题排查记录。
-- `docs/V5/`：RAG 检索增强设计。
-- `docs/V5.1/`：Assistant 和短期记忆设计记录。
 
 ## 开发提醒
 
