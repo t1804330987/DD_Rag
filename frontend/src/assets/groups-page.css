@@ -341,6 +341,11 @@
   color: #102a3b;
 }
 
+.groups-member-list__profile {
+  display: grid;
+  gap: 0.2rem;
+}
+
 .permissions-list {
   display: grid;
   gap: 0.6rem;

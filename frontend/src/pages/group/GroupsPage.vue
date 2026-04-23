@@ -114,6 +114,7 @@ const selectedMemberMessage = computed(() => {
 const totalPendingCount = computed(
   () => pendingInvitations.value.length + myJoinRequests.value.length + ownerJoinRequests.value.length,
 )
+const currentUserIdLabel = computed(() => authStore.currentUser?.userId?.toString() ?? '--')
 const pageHeroDescription = computed(() =>
   shouldShowOnboarding.value
     ? '首页先回答“当前在哪”和“下一步做什么”，再进入具体知识库动作。'
@@ -493,6 +494,10 @@ async function handleLeaveGroup(groupId: number) {
               <div class="groups-page__identity">
                 <span>当前用户</span>
                 <strong>{{ currentUserLabel }}</strong>
+              </div>
+              <div class="groups-page__identity">
+                <span>我的用户 ID</span>
+                <strong>{{ currentUserIdLabel }}</strong>
               </div>
             </div>
           </template>

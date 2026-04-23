@@ -210,13 +210,18 @@ function handleInviteeUserIdInput(event: Event) {
               </button>
             </div>
           </label>
+          <p class="detail-note">可让对方在“我的组”页右上角查看自己的用户 ID，再把该编号发给你。</p>
 
           <p v-if="isMembersLoading" class="placeholder-text">正在加载成员列表...</p>
           <ul v-else class="groups-member-list">
             <li v-for="member in groupMembers" :key="`member-${member.userId}`" class="groups-member-list__item">
-              <div>
+              <div class="groups-member-list__profile">
                 <strong>{{ member.displayName }}</strong>
-                <span>{{ member.role === 'OWNER' ? '所有者' : member.role }}</span>
+                <span>
+                  用户 ID：{{ member.userId }} · 用户编码：{{ member.userCode }} · 角色：{{
+                    member.role === 'OWNER' ? '所有者' : member.role
+                  }}
+                </span>
               </div>
               <button
                 v-if="member.role !== 'OWNER'"
