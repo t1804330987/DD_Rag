@@ -4,6 +4,12 @@
 
 如果你正在找一个能写进简历、能讲清架构、能覆盖 Spring AI / Spring AI Alibaba 技术点的项目，DD_Rag 值得 Star。
 
+# 社区支持 
+
+学 AI , 上 L 站
+
+[LinuxDO](https://linux.do/)
+
 ## 在线体验
 
 当前可用演示入口：
