@@ -299,6 +299,12 @@ Elasticvue：http://localhost:8088
 http://www.ddrag.top
 ```
 
+当前可用演示入口：
+
+```text
+http://106.55.44.191:5173/login?redirect=/groups
+```
+
 ### 3. 双机部署
 
 双机部署适合小内存服务器：
