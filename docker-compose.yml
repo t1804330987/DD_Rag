@@ -94,7 +94,7 @@ services:
       sh -c "mvn -q -Dmaven.test.skip=true spring-boot:run"
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:?set DASHSCOPE_API_KEY in your shell or .env}
+      DASHSCOPE_API_KEY: # 填写Apikey
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dd_rag
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: 123456
@@ -109,7 +109,7 @@ services:
       DD_RAG_JWT_SECRET: dd-rag-dev-jwt-secret-2026-04-20-32bytes
       MAVEN_OPTS: -Dfile.encoding=UTF-8
     ports:
-      - "${BACKEND_PORT:-18080}:8080"
+      - "18080:8080"
     volumes:
       - ./:/workspace
       - maven-repo:/root/.m2
