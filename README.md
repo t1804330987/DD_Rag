@@ -4,6 +4,14 @@
 
 如果你正在找一个能写进简历、能讲清架构、能覆盖 Spring AI / Spring AI Alibaba 技术点的项目，DD_Rag 值得 Star。
 
+## 在线体验
+
+当前可用演示入口：
+
+```text
+http://106.55.44.191:5173/login
+```
+
 ## 为什么做这个项目
 
 从第一性原理看，企业知识库问答至少要解决 4 个问题：
@@ -291,18 +299,6 @@ docker compose up -d --build
 后端：http://localhost:18080
 MinIO：http://localhost:9001
 Elasticvue：http://localhost:8088
-```
-
-线上域名：
-
-```text
-http://www.ddrag.top
-```
-
-当前可用演示入口：
-
-```text
-http://106.55.44.191:5173/login?redirect=/groups
 ```
 
 ### 3. 双机部署
