@@ -43,7 +43,6 @@ const activeSectionLabel = computed(() =>
               <nav class="admin-local-nav" aria-label="管理员导航">
                 <RouterLink to="/admin/overview" active-class="is-active">后台首页</RouterLink>
                 <RouterLink to="/admin/users" active-class="is-active">用户管理</RouterLink>
-                <RouterLink to="/account/security" active-class="is-active">账户安全</RouterLink>
               </nav>
             </div>
           </template>

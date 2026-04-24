@@ -30,13 +30,6 @@ export async function updateAdminUserStatus(userId: number, status: UserStatus):
   unwrapApiResponse(data, '更新用户状态失败')
 }
 
-export async function resetAdminUserPassword(userId: number, newPassword: string): Promise<void> {
-  const { data } = await http.post<ApiResponse<null>>(`/admin/users/${userId}/reset-password`, {
-    newPassword,
-  })
-  unwrapApiResponse(data, '重置密码失败')
-}
-
 function unwrapApiResponse<T>(payload: ApiResponse<T>, fallbackMessage: string): T {
   if (!payload.success) {
     throw new Error(payload.message ?? fallbackMessage)

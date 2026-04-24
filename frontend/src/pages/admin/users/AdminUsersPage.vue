@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   fetchAdminUsers,
-  resetAdminUserPassword,
   updateAdminUserStatus,
   type AdminUserItem,
   type UserStatus,
@@ -72,16 +71,6 @@ async function handleStatusChange(user: AdminUserItem) {
   })
 }
 
-async function handleResetPassword(user: AdminUserItem) {
-  const newPassword = window.prompt(`请输入「${user.username}」的新密码`)
-  if (newPassword === null) return
-
-  await runUserAction(user.userId, '重置密码失败', async () => {
-    await resetAdminUserPassword(user.userId, newPassword)
-    pageFeedback.value = `已重置用户「${user.username}」的密码。`
-  })
-}
-
 async function runUserAction(userId: number, fallbackMessage: string, action: () => Promise<void>) {
   const nextActionUserIds = new Set(actionUserIds.value)
   nextActionUserIds.add(userId)
@@ -120,7 +109,7 @@ function updateStatusFilter(value: 'ALL' | UserStatus) {
           <p class="panel__eyebrow">用户总览</p>
           <h2>用户管理</h2>
           <p class="admin-panel__description">
-            先看账号状态，再决定禁用、重置密码或进入详情页，避免在同一表格里混淆治理动作。
+            先看账号状态，再决定禁用或进入详情页，避免在同一表格里混淆治理动作。
           </p>
         </div>
         <div class="admin-panel__header-actions">
@@ -226,6 +215,7 @@ function updateStatusFilter(value: 'ALL' | UserStatus) {
                   <strong>{{ user.displayName }}</strong>
                   <span>{{ user.username }}</span>
                   <small>{{ user.email }}</small>
+                  <small>用户 ID：{{ user.userId }}</small>
                   <small>账号编码：{{ user.userCode }}</small>
                   <button
                     class="admin-user-cell__link"
@@ -260,14 +250,6 @@ function updateStatusFilter(value: 'ALL' | UserStatus) {
                     @click="handleStatusChange(user)"
                   >
                     {{ user.status === 'ACTIVE' ? '禁用' : '启用' }}
-                  </button>
-                  <button
-                    class="ghost-button"
-                    type="button"
-                    :disabled="actionUserIds.has(user.userId)"
-                    @click="handleResetPassword(user)"
-                  >
-                    重置密码
                   </button>
                 </div>
               </td>

@@ -32,6 +32,12 @@ export interface ChangePasswordPayload {
   newPassword: string
 }
 
+export interface ResetPasswordByIdentityPayload {
+  username: string
+  email: string
+  newPassword: string
+}
+
 export async function login(payload: LoginPayload): Promise<AuthSessionResponse> {
   const { data } = await http.post<ApiResponse<AuthSessionResponse>>('/auth/login', payload, {
     withCredentials: true,
@@ -68,6 +74,11 @@ export async function fetchCurrentUser(): Promise<CurrentUserProfile> {
 
 export async function changePassword(payload: ChangePasswordPayload): Promise<void> {
   const { data } = await http.post<ApiResponse<null>>('/account/change-password', payload)
+  unwrapApiResponse(data, '修改密码失败')
+}
+
+export async function resetPasswordByIdentity(payload: ResetPasswordByIdentityPayload): Promise<void> {
+  const { data } = await http.post<ApiResponse<null>>('/auth/reset-password', payload)
   unwrapApiResponse(data, '修改密码失败')
 }
 

@@ -221,6 +221,61 @@ class AuthServiceTest {
     }
 
     @Test
+    void shouldRejectRegisterWhenUsernameIsReservedWord() {
+        RegisterRequest request = new RegisterRequest(
+                " NULL ",
+                "reserved-null@local.ddrag.test",
+                "保留名用户",
+                "UserPass123"
+        );
+
+        assertThatThrownBy(() -> authService.register(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("用户名不合法");
+    }
+
+    @Test
+    void shouldRejectRegisterWhenUsernameContainsIllegalCharacters() {
+        RegisterRequest request = new RegisterRequest(
+                "bad user",
+                "bad-user@local.ddrag.test",
+                "非法字符用户",
+                "UserPass123"
+        );
+
+        assertThatThrownBy(() -> authService.register(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("用户名不合法");
+    }
+
+    @Test
+    void shouldResetPasswordByUsernameAndEmail() {
+        seedCustomUser(9110L, "recover-user", "recover-user@local.ddrag.test", "InitPass123!", SystemRole.USER, UserStatus.ACTIVE);
+        AuthTokens tokens = authService.login("recover-user", "InitPass123!");
+
+        authService.resetPasswordByIdentity(" recover-user ", " recover-user@local.ddrag.test ", "BetterPass123");
+
+        assertThatThrownBy(() -> authService.login("recover-user", "InitPass123!"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("账号或密码错误");
+        assertThat(authService.login("recover-user", "BetterPass123").accessToken()).isNotBlank();
+        assertThat(refreshTokenService.findActiveToken(tokens.refreshToken())).isEmpty();
+    }
+
+    @Test
+    void shouldRejectResetPasswordWhenUsernameAndEmailDoNotMatch() {
+        seedCustomUser(9111L, "recover-user-2", "recover-user-2@local.ddrag.test", "InitPass123!", SystemRole.USER, UserStatus.ACTIVE);
+
+        assertThatThrownBy(() -> authService.resetPasswordByIdentity(
+                "recover-user-2",
+                "wrong@local.ddrag.test",
+                "BetterPass123"
+        ))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("账号信息不匹配");
+    }
+
+    @Test
     void shouldRejectRegisterWhenEmailExists() {
         seedCustomUser(9109L, "existing-email-user", "existing-email@local.ddrag.test", "InitPass123!", SystemRole.USER, UserStatus.ACTIVE);
 

@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   fetchAdminUserDetail,
-  resetAdminUserPassword,
   updateAdminUserStatus,
   type AdminUserItem,
   type UserStatus,
@@ -81,21 +80,6 @@ async function handleStatusChange() {
   })
 }
 
-async function handleResetPassword() {
-  if (user.value === null) {
-    return
-  }
-  const newPassword = window.prompt(`请输入「${user.value.username}」的新密码`)
-  if (newPassword === null) {
-    return
-  }
-
-  await runDetailAction('重置密码失败', async () => {
-    await resetAdminUserPassword(user.value!.userId, newPassword)
-    pageFeedback.value = `已重置用户「${user.value!.username}」的密码。`
-  })
-}
-
 async function runDetailAction(fallbackMessage: string, action: () => Promise<void>) {
   isActing.value = true
   pageError.value = ''
@@ -151,9 +135,6 @@ async function runDetailAction(fallbackMessage: string, action: () => Promise<vo
           <div class="admin-detail-hero__actions">
             <button class="ghost-button" type="button" :disabled="isActing" @click="handleStatusChange">
               {{ user.status === 'ACTIVE' ? '禁用账号' : '启用账号' }}
-            </button>
-            <button class="primary-button" type="button" :disabled="isActing" @click="handleResetPassword">
-              {{ isActing ? '处理中...' : '重置密码' }}
             </button>
           </div>
         </article>

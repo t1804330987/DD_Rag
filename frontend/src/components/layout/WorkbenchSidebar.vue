@@ -77,7 +77,7 @@ function isActive(targetPath: string) {
       </div>
 
       <div class="workbench-sidebar__actions">
-        <RouterLink class="workbench-sidebar__security-link" to="/account/security">
+        <RouterLink v-if="!authStore.isAdmin" class="workbench-sidebar__security-link" to="/account/security">
           账号安全
         </RouterLink>
         <SessionLogoutButton class="workbench-sidebar__logout" />

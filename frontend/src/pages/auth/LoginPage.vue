@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { resetPasswordByIdentity } from '../../api/auth'
 import { extractApiError } from '../../api/http'
 import '../../assets/login-page.css'
 import AuthSplitShell from '../../components/auth/AuthSplitShell.vue'
@@ -15,9 +16,16 @@ const form = reactive({
   password: '',
 })
 
+const resetForm = reactive({
+  username: '',
+  email: '',
+  newPassword: '',
+})
+
 const pageError = ref('')
 const pageNotice = ref('')
 const isBootstrapping = ref(false)
+const pageMode = ref<'login' | 'reset-password'>('login')
 
 onMounted(() => {
   pageNotice.value = route.query.registered === '1' ? '注册成功，请使用新账号登录。' : ''
@@ -53,6 +61,40 @@ async function handleSubmit() {
   } catch (error) {
     pageError.value = extractApiError(error, '登录失败，请检查账号或密码')
   }
+}
+
+async function handleResetPassword() {
+  pageError.value = ''
+
+  if (resetForm.username.trim().length === 0 || resetForm.email.trim().length === 0 || resetForm.newPassword.length === 0) {
+    pageError.value = '请输入用户名、邮箱和新密码'
+    return
+  }
+
+  try {
+    await resetPasswordByIdentity({
+      username: resetForm.username.trim(),
+      email: resetForm.email.trim(),
+      newPassword: resetForm.newPassword,
+    })
+    pageMode.value = 'login'
+    pageNotice.value = '密码已更新，请使用新密码登录。'
+    resetForm.newPassword = ''
+  } catch (error) {
+    pageError.value = extractApiError(error, '修改密码失败，请检查用户名、邮箱或密码格式')
+  }
+}
+
+function switchToLogin() {
+  pageMode.value = 'login'
+  pageError.value = ''
+  pageNotice.value = ''
+}
+
+function switchToResetPassword() {
+  pageMode.value = 'reset-password'
+  pageError.value = ''
+  pageNotice.value = ''
 }
 
 function readRedirectQuery(): string | null {
@@ -96,11 +138,17 @@ function readRedirectQuery(): string | null {
     <section class="auth-panel" aria-labelledby="login-title">
       <div class="auth-panel__header">
         <p class="auth-panel__eyebrow">Secure sign in</p>
-        <h2 id="login-title" class="auth-panel__title">登录</h2>
-        <p class="auth-panel__hint">支持用户名或邮箱登录，成功后会按当前角色自动跳转。</p>
+        <h2 id="login-title" class="auth-panel__title">{{ pageMode === 'login' ? '登录' : '修改密码' }}</h2>
+        <p class="auth-panel__hint">
+          {{
+            pageMode === 'login'
+              ? '支持用户名或邮箱登录，成功后会按当前角色自动跳转。'
+              : '使用用户名与唯一邮箱匹配身份后设置新密码。'
+          }}
+        </p>
       </div>
 
-      <form class="auth-form" @submit.prevent="handleSubmit">
+      <form v-if="pageMode === 'login'" class="auth-form" @submit.prevent="handleSubmit">
         <label class="auth-form__field">
           <span>账号</span>
           <input
@@ -141,9 +189,69 @@ function readRedirectQuery(): string | null {
         </button>
       </form>
 
+      <form v-else class="auth-form" @submit.prevent="handleResetPassword">
+        <label class="auth-form__field">
+          <span>用户名</span>
+          <input
+            v-model="resetForm.username"
+            type="text"
+            autocomplete="username"
+            maxlength="64"
+            placeholder="输入用户名"
+            :disabled="isBootstrapping"
+          />
+        </label>
+
+        <label class="auth-form__field">
+          <span>邮箱</span>
+          <input
+            v-model="resetForm.email"
+            type="email"
+            autocomplete="email"
+            maxlength="128"
+            placeholder="输入注册邮箱"
+            :disabled="isBootstrapping"
+          />
+        </label>
+
+        <label class="auth-form__field">
+          <span>新密码</span>
+          <input
+            v-model="resetForm.newPassword"
+            type="password"
+            autocomplete="new-password"
+            maxlength="128"
+            placeholder="输入新密码"
+            :disabled="isBootstrapping"
+          />
+        </label>
+
+        <p v-if="pageError" class="auth-form__error" role="alert">
+          {{ pageError }}
+        </p>
+        <p v-if="pageNotice" class="auth-form__notice">
+          {{ pageNotice }}
+        </p>
+
+        <button
+          class="auth-form__submit"
+          type="submit"
+          :disabled="isBootstrapping"
+        >
+          更新密码
+        </button>
+      </form>
+
       <div class="auth-panel__footer">
-        <span>还没有账号？</span>
-        <RouterLink class="auth-page-link" to="/register">创建新账号</RouterLink>
+        <template v-if="pageMode === 'login'">
+          <span>还没有账号？</span>
+          <RouterLink class="auth-page-link" to="/register">创建新账号</RouterLink>
+          <button class="auth-page-link auth-page-link--button" type="button" @click="switchToResetPassword">修改密码</button>
+        </template>
+        <template v-else>
+          <span>想返回登录？</span>
+          <button class="auth-page-link auth-page-link--button" type="button" @click="switchToLogin">返回登录</button>
+        </template>
       </div>
     </section>
   </AuthSplitShell>

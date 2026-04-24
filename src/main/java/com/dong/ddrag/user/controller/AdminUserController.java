@@ -2,7 +2,6 @@ package com.dong.ddrag.user.controller;
 
 import com.dong.ddrag.common.api.ApiResponse;
 import com.dong.ddrag.identity.service.CurrentUserService;
-import com.dong.ddrag.user.model.dto.ResetUserPasswordRequest;
 import com.dong.ddrag.user.model.dto.UpdateUserStatusRequest;
 import com.dong.ddrag.user.model.vo.AdminUserItemResponse;
 import com.dong.ddrag.user.service.AdminUserService;
@@ -11,7 +10,6 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -59,14 +57,4 @@ public class AdminUserController {
         return ApiResponse.success(null);
     }
 
-    @PostMapping("/{userId}/reset-password")
-    public ApiResponse<Void> resetPassword(
-            @PathVariable Long userId,
-            @Valid @RequestBody ResetUserPasswordRequest request,
-            HttpServletRequest httpServletRequest
-    ) {
-        currentUserService.requireSystemAdmin(httpServletRequest);
-        adminUserService.resetPassword(userId, request);
-        return ApiResponse.success(null);
-    }
 }

@@ -14,9 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @Service
 public class AuthService {
@@ -30,6 +32,8 @@ public class AuthService {
     private static final int MIN_PASSWORD_LENGTH = 8;
     private static final int MAX_PASSWORD_LENGTH = 256;
     private static final int BCRYPT_MAX_PASSWORD_BYTES = 72;
+    private static final Pattern USERNAME_PATTERN = Pattern.compile("^[A-Za-z0-9_-]+$");
+    private static final Set<String> RESERVED_USERNAMES = Set.of("admin", "root", "null", "undefined", "system");
 
     private final JdbcTemplate jdbcTemplate;
     private final PasswordHasher passwordHasher;
@@ -90,6 +94,27 @@ public class AuthService {
     }
 
     @Transactional
+    public void resetPasswordByIdentity(String username, String email, String newPassword) {
+        String normalizedUsername = normalizeUsername(username);
+        String normalizedEmail = normalizeRequiredValue(email, "邮箱不能为空", "邮箱长度不能超过 128", MAX_EMAIL_LENGTH);
+        validateRegisterPassword(newPassword);
+        UserAccount user = loadUserByUsernameAndEmail(normalizedUsername, normalizedEmail);
+        int updated = jdbcTemplate.update(
+                """
+                update users
+                set password_hash = ?, must_change_password = false, updated_at = now()
+                where id = ?
+                """,
+                passwordHasher.hash(newPassword),
+                user.userId()
+        );
+        if (updated == 0) {
+            throw new BusinessException("账号信息不匹配");
+        }
+        refreshTokenService.revokeActiveTokens(user.userId());
+    }
+
+    @Transactional
     public AuthTokens refresh(String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new BusinessException("refresh token 不存在或已失效");
@@ -131,7 +156,7 @@ public class AuthService {
         if (request == null) {
             throw new BusinessException("注册请求不能为空");
         }
-        String username = normalizeRequiredValue(request.username(), "用户名不能为空", "用户名长度不能超过 64", MAX_USERNAME_LENGTH);
+        String username = normalizeUsername(request.username());
         String email = normalizeRequiredValue(request.email(), "邮箱不能为空", "邮箱长度不能超过 128", MAX_EMAIL_LENGTH);
         String displayName = normalizeRequiredValue(
                 request.displayName(),
@@ -194,6 +219,17 @@ public class AuthService {
         }
     }
 
+    private String normalizeUsername(String username) {
+        String normalizedValue = normalizeRequiredValue(username, "用户名不能为空", "用户名长度不能超过 64", MAX_USERNAME_LENGTH);
+        if (!USERNAME_PATTERN.matcher(normalizedValue).matches()) {
+            throw new BusinessException("用户名不合法");
+        }
+        if (RESERVED_USERNAMES.contains(normalizedValue.toLowerCase(Locale.ROOT))) {
+            throw new BusinessException("用户名不合法");
+        }
+        return normalizedValue;
+    }
+
     private String normalizeRequiredValue(String value, String blankMessage, String lengthMessage, int maxLength) {
         if (value == null || value.isBlank()) {
             throw new BusinessException(blankMessage);
@@ -230,6 +266,36 @@ public class AuthService {
                 email
         );
         return count != null && count > 0;
+    }
+
+    private UserAccount loadUserByUsernameAndEmail(String username, String email) {
+        List<UserAccount> users = jdbcTemplate.query(
+                """
+                select id, user_code, username, email, display_name, password_hash,
+                       system_role, status, must_change_password
+                from users
+                where username = ? and email = ?
+                order by id
+                for update
+                """,
+                (resultSet, rowNum) -> new UserAccount(
+                        resultSet.getLong("id"),
+                        resultSet.getString("user_code"),
+                        resultSet.getString("username"),
+                        resultSet.getString("email"),
+                        resultSet.getString("display_name"),
+                        resultSet.getString("password_hash"),
+                        SystemRole.valueOf(resultSet.getString("system_role")),
+                        UserStatus.valueOf(resultSet.getString("status")),
+                        resultSet.getBoolean("must_change_password")
+                ),
+                username,
+                email
+        );
+        if (users.size() != 1) {
+            throw new BusinessException("账号信息不匹配");
+        }
+        return users.getFirst();
     }
 
     private UserAccount loadUserForLogin(String loginId) {

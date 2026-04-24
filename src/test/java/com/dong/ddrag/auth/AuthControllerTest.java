@@ -34,6 +34,7 @@ import java.sql.SQLException;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -207,6 +208,50 @@ class AuthControllerTest {
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("新密码必须至少 8 位，且同时包含字母和数字"));
+    }
+
+    @Test
+    void shouldRejectRegisterWhenUsernameIsReservedWord() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username":"admin",
+                                  "email":"admin-duplicate@local.ddrag.test",
+                                  "displayName":"保留名用户",
+                                  "password":"UserPass123"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("用户名不合法"));
+    }
+
+    @Test
+    void shouldResetPasswordByUsernameAndEmailWithoutAuthorization() throws Exception {
+        LoginSeed seed = new LoginSeed(9204L, "u9204", "InitPass123!", SystemRole.USER, UserStatus.ACTIVE);
+        seedLoginUser(seed);
+        AuthTokens loginTokens = authService.login(seed.loginId(), seed.rawPassword());
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username":"u9204",
+                                  "email":"u9204@local.ddrag.test",
+                                  "newPassword":"BetterPass123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()));
+
+        assertThatThrownBy(() -> authService.login("u9204", "InitPass123!"))
+                .isInstanceOf(com.dong.ddrag.common.exception.BusinessException.class)
+                .hasMessageContaining("账号或密码错误");
+        assertThat(authService.login("u9204", "BetterPass123").accessToken()).isNotBlank();
+        assertThat(refreshTokenService.findActiveToken(loginTokens.refreshToken())).isEmpty();
     }
 
     @AfterAll

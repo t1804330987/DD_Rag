@@ -86,7 +86,7 @@ class AdminUserControllerTest {
     }
 
     @Test
-    void shouldAllowAdminToCreateDisableAndResetUser() throws Exception {
+    void shouldAllowAdminToCreateAndDisableUser() throws Exception {
         seedLoginUser(9501L, "admin", "AdminInit123!", SystemRole.ADMIN, UserStatus.ACTIVE);
         String adminToken = authService.login("admin", "AdminInit123!").accessToken();
 
@@ -112,20 +112,6 @@ class AdminUserControllerTest {
         long userId = findUserId("u2001");
         assertThat(loadMustChangePassword(userId)).isTrue();
 
-        mockMvc.perform(post("/api/admin/users/{id}/reset-password", userId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"newPassword":"ResetPass789"}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-
-        assertThatThrownBy(() -> authService.login("u2001", "InitPass456"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("账号或密码错误");
-        assertThat(authService.login("u2001", "ResetPass789").mustChangePassword()).isTrue();
-
         mockMvc.perform(patch("/api/admin/users/{id}/status", userId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -138,6 +124,22 @@ class AdminUserControllerTest {
         assertThatThrownBy(() -> authService.login("u2001", "ResetPass789"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("账号已被禁用");
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenResetPasswordEndpointIsRemoved() throws Exception {
+        seedLoginUser(9501L, "admin", "AdminInit123!", SystemRole.ADMIN, UserStatus.ACTIVE);
+        seedLoginUser(9503L, "u2001", "InitPass456", SystemRole.USER, UserStatus.ACTIVE);
+        long userId = findUserId("u2001");
+        String adminToken = authService.login("admin", "AdminInit123!").accessToken();
+
+        mockMvc.perform(post("/api/admin/users/{id}/reset-password", userId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"newPassword":"ResetPass789"}
+                                """))
+                .andExpect(status().isNotFound());
     }
 
     @Test

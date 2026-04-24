@@ -126,11 +126,7 @@ function formatLastLogin(value: string | null) {
         <div class="admin-overview-actions">
           <button class="admin-overview-action" type="button" @click="goToUsers">
             <strong>查看用户列表</strong>
-            <span>进入账号列表，统一处理状态切换、密码重置与筛选排查。</span>
-          </button>
-          <button class="admin-overview-action" type="button" @click="router.push('/account/security')">
-            <strong>检查账号安全</strong>
-            <span>返回个人改密页，确保当前管理员自身凭据也处于安全状态。</span>
+            <span>进入账号列表，统一处理状态切换与筛选排查。</span>
           </button>
           <article class="admin-overview-highlights__note">
             <strong>治理边界</strong>
