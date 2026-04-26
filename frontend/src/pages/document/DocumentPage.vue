@@ -34,7 +34,7 @@ import '../../assets/page-shell.css'
 import '../../assets/document-page.css'
 import DocumentPageToolbar from './components/DocumentPageToolbar.vue'
 import DocumentStatusBoard from './components/DocumentStatusBoard.vue'
-import { uploadDocumentWithResume, type UploadStage } from './documentUpload'
+import { uploadDocumentWithResume, type UploadMode, type UploadStage } from './documentUpload'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -52,6 +52,7 @@ const isLoading = ref(false)
 const isUploading = ref(false)
 const uploadProgress = ref(0)
 const uploadStage = ref<UploadStage | 'idle'>('idle')
+const uploadMode = ref<UploadMode | 'unknown'>('unknown')
 const deletingDocumentIds = ref<Set<number>>(new Set())
 const retryingDocumentIds = ref<Set<number>>(new Set())
 const isPreviewOpen = ref(false)
@@ -187,6 +188,7 @@ function resetPageForContextChange() {
   isUploading.value = false
   uploadProgress.value = 0
   uploadStage.value = 'idle'
+  uploadMode.value = 'unknown'
   deletingDocumentIds.value = new Set()
   retryingDocumentIds.value = new Set()
   documentsError.value = ''
@@ -317,6 +319,7 @@ async function handleUpload() {
   isUploading.value = true
   uploadProgress.value = 0
   uploadStage.value = 'hashing'
+  uploadMode.value = 'resumable'
   uploadFeedback.value = ''
   uploadError.value = ''
 
@@ -328,13 +331,18 @@ async function handleUpload() {
         if (isCurrentDocumentContext(contextVersion, contextKey)) {
           uploadProgress.value = payload.percent
           uploadStage.value = payload.stage
+          uploadMode.value = payload.mode
         }
       },
     )
     if (!isCurrentDocumentContext(contextVersion, contextKey)) {
       return
     }
-    uploadFeedback.value = `文件已提交，文档 ID #${documentId}。若仍在处理中，可稍后刷新。`
+    const fallbackNotice =
+      uploadMode.value === 'basic'
+        ? '当前环境不支持秒传/断点续传，已自动切换为普通上传模式。'
+        : ''
+    uploadFeedback.value = `${fallbackNotice}文件已提交，文档 ID #${documentId}。若仍在处理中，可稍后刷新。`
     resetSelectedFile()
     await loadDocuments()
   } catch (error) {
@@ -572,11 +580,11 @@ const uploadStageText = computed(() => {
     case 'hashing':
       return '正在计算文件指纹...'
     case 'checking':
-      return '正在检查秒传与续传状态...'
+      return uploadMode.value === 'basic' ? '当前环境不支持秒传/断点续传，已切换普通上传...' : '正在检查秒传与续传状态...'
     case 'uploading':
-      return `正在上传分片：${uploadProgress.value}%`
+      return uploadMode.value === 'basic' ? `正在普通上传：${uploadProgress.value}%` : `正在上传分片：${uploadProgress.value}%`
     case 'completing':
-      return '分片已完成，正在提交合并...'
+      return uploadMode.value === 'basic' ? '文件已上传，正在提交处理...' : '分片已完成，正在提交合并...'
     default:
       return ''
   }
