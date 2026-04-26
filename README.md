@@ -357,8 +357,6 @@ DD_Rag
 ## 推荐阅读
 
 - `docs/PROJECT_READING_GUIDE.md`：项目代码阅读路线。
-- `docs/GITHUB_PUBLISH_GUIDE.md`：GitHub clean 快照发布流程。
-- `docs/DEPLOYMENT_RECORD.md`：部署记录。
 
 ## 开发提醒
 
