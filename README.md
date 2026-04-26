@@ -358,14 +358,6 @@ DD_Rag
 
 - `docs/PROJECT_READING_GUIDE.md`：项目代码阅读路线。
 
-## 开发提醒
-
-- 不要把真实 API Key、密码、Token 提交到仓库。
-- Elasticsearch 必须安装 IK 插件，否则中文分词索引会失败。
-- `KB_SEARCH` 应理解为 Assistant Tool，而不是普通硬编码分支。
-- Assistant 当前使用短期记忆和会话摘要，不做自动长期记忆写入。
-- 普通业务接口必须区分系统级 `ADMIN / USER` 和组内 `OWNER / MEMBER`。
-
 ## Star
 
 如果这个项目对你理解 Java AI 工程、Spring AI、Spring AI Alibaba、RAG、Agent 或面试项目准备有帮助，可以点一个 Star。
