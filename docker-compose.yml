@@ -24,6 +24,10 @@ services:
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
+      http.cors.enabled: "true"
+      http.cors.allow-origin: "http://localhost:8088"
+      http.cors.allow-methods: "OPTIONS,HEAD,GET,POST,PUT,DELETE"
+      http.cors.allow-headers: "X-Requested-With,Content-Type,Content-Length,Authorization"
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
     ports:
       - "9200:9200"
@@ -94,7 +98,7 @@ services:
       sh -c "mvn -q -Dmaven.test.skip=true spring-boot:run"
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      DASHSCOPE_API_KEY: # 填写Apikey
+      DASHSCOPE_API_KEY: "填写 DashScope API Key" # 在这里填写 DashScope API Key，例如：sk-xxx
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dd_rag
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: 123456
@@ -135,7 +139,8 @@ services:
     command: >
       sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     environment:
-      VITE_API_BASE_URL: http://backend:8080
+      VITE_API_BASE_URL: /api
+      VITE_DEV_PROXY_TARGET: http://backend:8080
     ports:
       - "5173:5173"
     volumes:

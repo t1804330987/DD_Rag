@@ -16,7 +16,7 @@ spring:
       chat: dashscope
       embedding: ollama
     dashscope:
-      api-key: ${DASHSCOPE_API_KEY: # 填写Apikey}
+      api-key: ${DASHSCOPE_API_KEY:}
       chat:
         options:
           model: glm-5

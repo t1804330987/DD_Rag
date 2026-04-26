@@ -3,7 +3,6 @@ package com.dong.ddrag.auth.controller;
 import com.dong.ddrag.auth.config.AuthProperties;
 import com.dong.ddrag.auth.model.dto.LoginRequest;
 import com.dong.ddrag.auth.model.dto.RegisterRequest;
-import com.dong.ddrag.auth.model.dto.ResetPasswordByIdentityRequest;
 import com.dong.ddrag.auth.model.vo.AuthTokensResponse;
 import com.dong.ddrag.auth.model.vo.CurrentUserProfileResponse;
 import com.dong.ddrag.auth.security.AuthCookieSupport;
@@ -55,12 +54,6 @@ public class AuthController {
     @PostMapping("/register")
     public ApiResponse<Void> register(@Valid @RequestBody RegisterRequest request) {
         authService.register(request);
-        return ApiResponse.success(null);
-    }
-
-    @PostMapping("/reset-password")
-    public ApiResponse<Void> resetPassword(@Valid @RequestBody ResetPasswordByIdentityRequest request) {
-        authService.resetPasswordByIdentity(request.username(), request.email(), request.newPassword());
         return ApiResponse.success(null);
     }
 
