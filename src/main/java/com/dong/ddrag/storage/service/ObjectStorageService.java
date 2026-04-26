@@ -10,5 +10,7 @@ public interface ObjectStorageService {
 
     void putObject(String bucket, String objectKey, InputStream inputStream, long objectSize, String contentType);
 
+    void composeObject(String bucket, String targetObjectKey, java.util.List<String> sourceObjectKeys, String contentType);
+
     void deleteObject(String bucket, String objectKey);
 }

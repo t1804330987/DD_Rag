@@ -3,11 +3,17 @@ package com.dong.ddrag.document.controller;
 import com.dong.ddrag.common.api.ApiResponse;
 import com.dong.ddrag.document.model.dto.DocumentQuery;
 import com.dong.ddrag.document.model.dto.UploadDocumentRequest;
+import com.dong.ddrag.document.model.dto.UploadInitRequest;
+import com.dong.ddrag.document.model.dto.UploadChunkRequest;
 import com.dong.ddrag.document.model.vo.DocumentListItemVO;
 import com.dong.ddrag.document.model.vo.DocumentPreviewVO;
+import com.dong.ddrag.document.model.vo.UploadInitResponse;
+import com.dong.ddrag.document.model.vo.UploadStatusResponse;
 import com.dong.ddrag.document.service.DocumentService;
+import com.dong.ddrag.document.service.DocumentUploadService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -24,9 +30,44 @@ import java.util.List;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final DocumentUploadService documentUploadService;
 
-    public DocumentController(DocumentService documentService) {
+    public DocumentController(DocumentService documentService, DocumentUploadService documentUploadService) {
         this.documentService = documentService;
+        this.documentUploadService = documentUploadService;
+    }
+
+    @PostMapping(path = "/upload/init", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ApiResponse<UploadInitResponse> initUpload(
+            @RequestBody UploadInitRequest uploadRequest,
+            HttpServletRequest request
+    ) {
+        return ApiResponse.success(documentUploadService.initUpload(request, uploadRequest));
+    }
+
+    @PostMapping(path = "/upload/chunks", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<UploadStatusResponse> uploadChunk(
+            @ModelAttribute UploadChunkRequest uploadRequest,
+            HttpServletRequest request
+    ) {
+        documentUploadService.uploadChunk(request, uploadRequest);
+        return ApiResponse.success(documentUploadService.getUploadStatus(request, uploadRequest.uploadId()));
+    }
+
+    @GetMapping("/upload/{uploadId}")
+    public ApiResponse<UploadStatusResponse> getUploadStatus(
+            @PathVariable String uploadId,
+            HttpServletRequest request
+    ) {
+        return ApiResponse.success(documentUploadService.getUploadStatus(request, uploadId));
+    }
+
+    @PostMapping("/upload/{uploadId}/complete")
+    public ApiResponse<Long> completeUpload(
+            @PathVariable String uploadId,
+            HttpServletRequest request
+    ) {
+        return ApiResponse.success(documentUploadService.completeUpload(request, uploadId));
     }
 
     @PostMapping(path = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -52,6 +93,16 @@ public class DocumentController {
             HttpServletRequest request
     ) {
         documentService.softDeleteDocument(request, groupId, documentId);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/{documentId}/retry-ingestion")
+    public ApiResponse<Void> retryDocumentIngestion(
+            @PathVariable Long documentId,
+            @RequestParam Long groupId,
+            HttpServletRequest request
+    ) {
+        documentService.retryFailedDocumentIngestion(request, groupId, documentId);
         return ApiResponse.success(null);
     }
 

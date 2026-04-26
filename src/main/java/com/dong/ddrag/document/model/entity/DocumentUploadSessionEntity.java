@@ -2,9 +2,10 @@ package com.dong.ddrag.document.model.entity;
 
 import java.time.LocalDateTime;
 
-public class DocumentEntity {
+public class DocumentUploadSessionEntity {
 
     private Long id;
+    private String uploadId;
     private Long groupId;
     private Long uploaderUserId;
     private String fileName;
@@ -12,14 +13,12 @@ public class DocumentEntity {
     private String contentType;
     private Long fileSize;
     private String fileHash;
-    private String storageBucket;
-    private String storageObjectKey;
+    private Long chunkSize;
+    private Integer chunkCount;
     private String status;
-    private Boolean deleted;
-    private String failureReason;
-    private String previewText;
-    private LocalDateTime uploadedAt;
-    private LocalDateTime processedAt;
+    private String storageBucket;
+    private String mergedObjectKey;
+    private LocalDateTime expiresAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -29,6 +28,14 @@ public class DocumentEntity {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getUploadId() {
+        return uploadId;
+    }
+
+    public void setUploadId(String uploadId) {
+        this.uploadId = uploadId;
     }
 
     public Long getGroupId() {
@@ -87,20 +94,20 @@ public class DocumentEntity {
         this.fileHash = fileHash;
     }
 
-    public String getStorageBucket() {
-        return storageBucket;
+    public Long getChunkSize() {
+        return chunkSize;
     }
 
-    public void setStorageBucket(String storageBucket) {
-        this.storageBucket = storageBucket;
+    public void setChunkSize(Long chunkSize) {
+        this.chunkSize = chunkSize;
     }
 
-    public String getStorageObjectKey() {
-        return storageObjectKey;
+    public Integer getChunkCount() {
+        return chunkCount;
     }
 
-    public void setStorageObjectKey(String storageObjectKey) {
-        this.storageObjectKey = storageObjectKey;
+    public void setChunkCount(Integer chunkCount) {
+        this.chunkCount = chunkCount;
     }
 
     public String getStatus() {
@@ -111,44 +118,28 @@ public class DocumentEntity {
         this.status = status;
     }
 
-    public Boolean getDeleted() {
-        return deleted;
+    public String getStorageBucket() {
+        return storageBucket;
     }
 
-    public void setDeleted(Boolean deleted) {
-        this.deleted = deleted;
+    public void setStorageBucket(String storageBucket) {
+        this.storageBucket = storageBucket;
     }
 
-    public String getFailureReason() {
-        return failureReason;
+    public String getMergedObjectKey() {
+        return mergedObjectKey;
     }
 
-    public void setFailureReason(String failureReason) {
-        this.failureReason = failureReason;
+    public void setMergedObjectKey(String mergedObjectKey) {
+        this.mergedObjectKey = mergedObjectKey;
     }
 
-    public String getPreviewText() {
-        return previewText;
+    public LocalDateTime getExpiresAt() {
+        return expiresAt;
     }
 
-    public void setPreviewText(String previewText) {
-        this.previewText = previewText;
-    }
-
-    public LocalDateTime getUploadedAt() {
-        return uploadedAt;
-    }
-
-    public void setUploadedAt(LocalDateTime uploadedAt) {
-        this.uploadedAt = uploadedAt;
-    }
-
-    public LocalDateTime getProcessedAt() {
-        return processedAt;
-    }
-
-    public void setProcessedAt(LocalDateTime processedAt) {
-        this.processedAt = processedAt;
+    public void setExpiresAt(LocalDateTime expiresAt) {
+        this.expiresAt = expiresAt;
     }
 
     public LocalDateTime getCreatedAt() {

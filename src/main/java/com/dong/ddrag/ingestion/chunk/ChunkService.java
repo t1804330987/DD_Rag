@@ -26,6 +26,9 @@ public class ChunkService {
     private static final int CHUNK_SUMMARY_LENGTH = 120;
     private static final String DEFAULT_CHUNK_STRATEGY = "spring-ai-document";
     private static final String EMPTY_CHUNK_DOCUMENTS_MESSAGE = "文档切片结果为空，无法持久化";
+    private static final int INSERT_BATCH_PARAMETER_COUNT = 10;
+    private static final int POSTGRES_PARAMETER_LIMIT = 65_535;
+    private static final int MAX_INSERT_BATCH_SIZE = POSTGRES_PARAMETER_LIMIT / INSERT_BATCH_PARAMETER_COUNT;
 
     private final DocumentChunkMapper documentChunkMapper;
     private final ObjectMapper objectMapper;
@@ -44,10 +47,21 @@ public class ChunkService {
         }
         log.info("开始保存切片: documentId={}, groupId={}, chunkCount={}", documentId, groupId, chunks.size());
         documentChunkMapper.deleteByDocumentId(documentId);
-        documentChunkMapper.insertBatch(chunks);
+        persistChunkBatches(chunks);
         backfillChunkIds(documentId, chunks);
         log.info("切片保存完成: documentId={}, groupId={}, chunkCount={}", documentId, groupId, chunks.size());
         return chunks;
+    }
+
+    private void persistChunkBatches(List<DocumentChunkEntity> chunks) {
+        if (chunks.size() <= MAX_INSERT_BATCH_SIZE) {
+            documentChunkMapper.insertBatch(chunks);
+            return;
+        }
+        for (int start = 0; start < chunks.size(); start += MAX_INSERT_BATCH_SIZE) {
+            int end = Math.min(start + MAX_INSERT_BATCH_SIZE, chunks.size());
+            documentChunkMapper.insertBatch(chunks.subList(start, end));
+        }
     }
 
     private void backfillChunkIds(Long documentId, List<DocumentChunkEntity> chunks) {

@@ -21,6 +21,11 @@ public interface DocumentMapper {
             @Param("groupId") Long groupId
     );
 
+    DocumentEntity selectByGroupIdAndFileHash(
+            @Param("groupId") Long groupId,
+            @Param("fileHash") String fileHash
+    );
+
     int markDeleted(
             @Param("documentId") Long documentId,
             @Param("groupId") Long groupId
@@ -31,6 +36,14 @@ public interface DocumentMapper {
             @Param("groupId") Long groupId,
             @Param("status") String status,
             @Param("failureReason") String failureReason,
+            @Param("processedAt") LocalDateTime processedAt
+    );
+
+    int markStaleProcessingDocumentsFailed(
+            @Param("fromStatus") String fromStatus,
+            @Param("toStatus") String toStatus,
+            @Param("failureReason") String failureReason,
+            @Param("staleBefore") LocalDateTime staleBefore,
             @Param("processedAt") LocalDateTime processedAt
     );
 

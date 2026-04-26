@@ -41,6 +41,39 @@ interface UploadDocumentPayload {
   file: File
 }
 
+export interface InitDocumentUploadPayload {
+  groupId: number
+  fileName: string
+  fileSize: number
+  contentType: string
+  fileHash: string
+  chunkSize: number
+  chunkCount: number
+}
+
+export interface UploadChunkPayload {
+  uploadId: string
+  chunkIndex: number
+  chunkHash: string
+  chunk: Blob
+}
+
+export interface UploadInitResult {
+  instantUpload: boolean
+  documentId: number | null
+  uploadId: string | null
+  uploadedChunks: number[]
+  chunkSize: number | null
+  chunkCount: number | null
+}
+
+export interface UploadStatusResult {
+  status: string
+  uploadedChunks: number[]
+  uploadedChunkCount: number
+  chunkCount: number | null
+}
+
 type DocumentListPayload =
   | DocumentItem[]
   | ApiResponse<DocumentItem[] | { items?: unknown[]; list?: unknown[]; records?: unknown[] }>
@@ -80,6 +113,61 @@ export async function uploadDocument(payload: UploadDocumentPayload): Promise<nu
   return data.data
 }
 
+export async function initDocumentUpload(
+  payload: InitDocumentUploadPayload,
+): Promise<UploadInitResult> {
+  const { data } = await http.post<ApiResponse<UploadInitResult>>('/documents/upload/init', payload)
+
+  if (!data.success || !data.data) {
+    throw new Error(data.message ?? '初始化上传失败')
+  }
+
+  return normalizeUploadInitResult(data.data)
+}
+
+export async function uploadDocumentChunk(
+  payload: UploadChunkPayload,
+  onProgress?: (loadedBytes: number) => void,
+): Promise<UploadStatusResult> {
+  const formData = new FormData()
+  formData.append('uploadId', payload.uploadId)
+  formData.append('chunkIndex', String(payload.chunkIndex))
+  formData.append('chunkHash', payload.chunkHash)
+  formData.append('chunk', payload.chunk)
+
+  const { data } = await http.post<ApiResponse<UploadStatusResult>>('/documents/upload/chunks', formData, {
+    onUploadProgress: (event) => {
+      onProgress?.(event.loaded)
+    },
+  })
+
+  if (!data.success || !data.data) {
+    throw new Error(data.message ?? '上传分片失败')
+  }
+
+  return normalizeUploadStatusResult(data.data)
+}
+
+export async function fetchUploadStatus(uploadId: string): Promise<UploadStatusResult> {
+  const { data } = await http.get<ApiResponse<UploadStatusResult>>(`/documents/upload/${uploadId}`)
+
+  if (!data.success || !data.data) {
+    throw new Error(data.message ?? '获取上传状态失败')
+  }
+
+  return normalizeUploadStatusResult(data.data)
+}
+
+export async function completeDocumentUpload(uploadId: string): Promise<number> {
+  const { data } = await http.post<ApiResponse<number>>(`/documents/upload/${uploadId}/complete`)
+
+  if (!data.success || typeof data.data !== 'number') {
+    throw new Error(data.message ?? '完成上传失败')
+  }
+
+  return data.data
+}
+
 export async function deleteDocument(documentId: number, groupId: number): Promise<void> {
   const { data } = await http.delete<ApiResponse<null>>(`/documents/${documentId}`, {
     params: { groupId },
@@ -87,6 +175,16 @@ export async function deleteDocument(documentId: number, groupId: number): Promi
 
   if (!data.success) {
     throw new Error(data.message ?? '删除文档失败')
+  }
+}
+
+export async function retryDocumentIngestion(documentId: number, groupId: number): Promise<void> {
+  const { data } = await http.post<ApiResponse<null>>(`/documents/${documentId}/retry-ingestion`, null, {
+    params: { groupId },
+  })
+
+  if (!data.success) {
+    throw new Error(data.message ?? '重新处理文档失败')
   }
 }
 
@@ -143,6 +241,28 @@ function normalizeDocumentPreviewPayload(
     fileName: readString(source.fileName) ?? `文档 #${fallbackDocumentId}`,
     previewText,
     status: readString(source.status),
+  }
+}
+
+function normalizeUploadInitResult(payload: unknown): UploadInitResult {
+  const source = isRecord(payload) ? payload : {}
+  return {
+    instantUpload: Boolean(source.instantUpload),
+    documentId: readNumber(source.documentId),
+    uploadId: readString(source.uploadId),
+    uploadedChunks: readNumberArray(source.uploadedChunks),
+    chunkSize: readNumber(source.chunkSize),
+    chunkCount: readNumber(source.chunkCount),
+  }
+}
+
+function normalizeUploadStatusResult(payload: unknown): UploadStatusResult {
+  const source = isRecord(payload) ? payload : {}
+  return {
+    status: readString(source.status) ?? 'UNKNOWN',
+    uploadedChunks: readNumberArray(source.uploadedChunks),
+    uploadedChunkCount: readNumber(source.uploadedChunkCount) ?? 0,
+    chunkCount: readNumber(source.chunkCount),
   }
 }
 
@@ -221,6 +341,15 @@ function readNumber(value: unknown): number | null {
 
 function readString(value: unknown): string | null {
   return typeof value === 'string' ? value : null
+}
+
+function readNumberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value
+    .map((item) => readNumber(item))
+    .filter((item): item is number => typeof item === 'number')
 }
 
 function truncatePreviewText(value: string) {

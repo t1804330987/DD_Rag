@@ -13,6 +13,7 @@
             file_ext,
             content_type,
             file_size,
+            file_hash,
             storage_bucket,
             storage_object_key,
             status,
@@ -30,6 +31,7 @@
             #{fileExt},
             #{contentType},
             #{fileSize},
+            #{fileHash},
             #{storageBucket},
             #{storageObjectKey},
             #{status},
@@ -101,6 +103,7 @@
                file_ext as fileExt,
                content_type as contentType,
                file_size as fileSize,
+               file_hash as fileHash,
                storage_bucket as storageBucket,
                storage_object_key as storageObjectKey,
                status,
@@ -115,6 +118,34 @@
         where id = #{documentId}
           and group_id = #{groupId}
           and deleted = false
+    </select>
+
+    <select id="selectByGroupIdAndFileHash" resultType="com.dong.ddrag.document.model.entity.DocumentEntity">
+        select id,
+               group_id as groupId,
+               uploader_user_id as uploaderUserId,
+               file_name as fileName,
+               file_ext as fileExt,
+               content_type as contentType,
+               file_size as fileSize,
+               file_hash as fileHash,
+               storage_bucket as storageBucket,
+               storage_object_key as storageObjectKey,
+               status,
+               deleted,
+               failure_reason as failureReason,
+               preview_text as previewText,
+               uploaded_at as uploadedAt,
+               processed_at as processedAt,
+               created_at as createdAt,
+               updated_at as updatedAt
+        from documents
+        where group_id = #{groupId}
+          and file_hash = #{fileHash}
+          and status = 'READY'
+          and deleted = false
+        order by uploaded_at desc, id desc
+        limit 1
     </select>
 
     <update id="markDeleted">
@@ -134,6 +165,20 @@
             updated_at = now()
         where id = #{documentId}
           and group_id = #{groupId}
+          and deleted = false
+    </update>
+
+    <update id="markStaleProcessingDocumentsFailed">
+        update documents
+        set status = #{toStatus},
+            failure_reason = #{failureReason},
+            processed_at = #{processedAt},
+            updated_at = now()
+        where status = #{fromStatus}
+          and deleted = false
+        <if test="staleBefore != null">
+          and updated_at <![CDATA[<]]> #{staleBefore}
+        </if>
     </update>
 
     <update id="updatePreviewText">

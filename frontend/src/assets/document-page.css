@@ -28,7 +28,8 @@
 .documents-page__hero-actions,
 .document-toolbar__upload-actions,
 .document-filter-form__buttons,
-.table-actions {
+.table-actions,
+.documents-page__results-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -74,6 +75,40 @@
 
 .documents-page__feedback {
   gap: 0.5rem;
+}
+
+.document-upload-progress {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgba(49, 95, 131, 0.16);
+  border-radius: 1rem;
+  background: rgba(244, 248, 252, 0.92);
+}
+
+.document-upload-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  font-size: 0.82rem;
+  color: #4f6073;
+}
+
+.document-upload-progress__bar {
+  position: relative;
+  width: 100%;
+  height: 0.55rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(98, 128, 158, 0.18);
+}
+
+.document-upload-progress__value {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #315f83, #3e7aa3);
+  transition: width 0.2s ease;
 }
 
 .document-toolbar,
@@ -232,6 +267,16 @@
   justify-content: space-between;
   gap: 1rem;
   align-items: start;
+}
+
+.documents-page__results-actions {
+  justify-content: flex-end;
+}
+
+.document-auto-refresh-hint {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #60758c;
 }
 
 .document-status-board__panel-header h2 {

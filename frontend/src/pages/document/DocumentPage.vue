@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import {
   deleteDocument,
   fetchDocumentPreview,
   fetchDocuments,
-  uploadDocument,
+  retryDocumentIngestion,
   type DocumentItem,
 } from '../../api/document'
 import { fetchGroups } from '../../api/group'
@@ -34,6 +34,7 @@ import '../../assets/page-shell.css'
 import '../../assets/document-page.css'
 import DocumentPageToolbar from './components/DocumentPageToolbar.vue'
 import DocumentStatusBoard from './components/DocumentStatusBoard.vue'
+import { uploadDocumentWithResume, type UploadStage } from './documentUpload'
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -49,7 +50,10 @@ const uploadFeedback = ref('')
 const uploadError = ref('')
 const isLoading = ref(false)
 const isUploading = ref(false)
+const uploadProgress = ref(0)
+const uploadStage = ref<UploadStage | 'idle'>('idle')
 const deletingDocumentIds = ref<Set<number>>(new Set())
+const retryingDocumentIds = ref<Set<number>>(new Set())
 const isPreviewOpen = ref(false)
 const isPreviewLoading = ref(false)
 const previewDocumentId = ref<number | null>(null)
@@ -58,11 +62,15 @@ const previewStatus = ref('')
 const previewText = ref('')
 const previewMessage = ref('')
 const previewMessageTone = ref<'note' | 'error'>('note')
+const isPollingDocuments = ref(false)
 
 let documentContextVersion = 0
 let latestLoadRequestId = 0
 let latestPreviewRequestId = 0
 let latestGroupRequestToken = 0
+let pollingTimer: number | null = null
+
+const DOCUMENT_POLL_INTERVAL_MS = 4000
 
 const visibleGroups = computed(() => appStore.visibleGroups)
 const currentGroup = computed(() => appStore.currentGroup)
@@ -78,6 +86,9 @@ const statusSummaryItems = computed(() =>
   createDocumentStatusSummary(visibleDocuments.value, totalSize.value),
 )
 const recentFailures = computed(() => collectRecentDocumentFailures(visibleDocuments.value))
+const hasPendingDocuments = computed(() =>
+  documents.value.some((item) => item.status === 'PROCESSING' || item.status === 'UPLOADED'),
+)
 const currentContextKey = computed(
   () => `${authStore.currentUser?.userId ?? 'anonymous'}:${currentGroupId.value ?? 'none'}`,
 )
@@ -140,6 +151,10 @@ watch(
   { immediate: true },
 )
 
+onBeforeUnmount(() => {
+  stopDocumentPolling()
+})
+
 async function refreshGroups() {
   const currentToken = ++latestGroupRequestToken
   appStore.setGroupsLoading(true)
@@ -165,10 +180,15 @@ async function refreshGroups() {
 }
 
 function resetPageForContextChange() {
+  stopDocumentPolling()
   documents.value = []
   isLoading.value = false
+  isPollingDocuments.value = false
   isUploading.value = false
+  uploadProgress.value = 0
+  uploadStage.value = 'idle'
   deletingDocumentIds.value = new Set()
+  retryingDocumentIds.value = new Set()
   documentsError.value = ''
   uploadFeedback.value = ''
   uploadError.value = ''
@@ -186,8 +206,9 @@ function syncDefaultFilters() {
   )
 }
 
-async function loadDocuments() {
+async function loadDocuments(options: { silent?: boolean } = {}) {
   if (!canLoadDocuments.value || currentGroupId.value === null) {
+    stopDocumentPolling()
     documents.value = []
     return
   }
@@ -195,10 +216,16 @@ async function loadDocuments() {
   const contextVersion = documentContextVersion
   const contextKey = currentContextKey.value
   const requestId = ++latestLoadRequestId
-  isLoading.value = true
+  clearDocumentPollingTimer()
+  if (options.silent) {
+    isPollingDocuments.value = true
+  } else {
+    isLoading.value = true
+  }
   documentsError.value = ''
 
   try {
+    const previousDocuments = documents.value
     const nextDocuments = await fetchDocuments({
       groupId: filters.groupId ?? currentGroupId.value ?? undefined,
       fileName: filters.fileName.trim() || undefined,
@@ -208,6 +235,9 @@ async function loadDocuments() {
     })
     if (isActiveDocumentRequest(contextVersion, contextKey, requestId)) {
       documents.value = nextDocuments
+      if (options.silent) {
+        syncPollingFeedback(previousDocuments, nextDocuments)
+      }
     }
   } catch (error) {
     if (isActiveDocumentRequest(contextVersion, contextKey, requestId)) {
@@ -216,9 +246,21 @@ async function loadDocuments() {
     }
   } finally {
     if (isActiveDocumentRequest(contextVersion, contextKey, requestId)) {
-      isLoading.value = false
+      if (options.silent) {
+        isPollingDocuments.value = false
+      } else {
+        isLoading.value = false
+      }
+      syncDocumentPolling()
     }
   }
+}
+
+async function handleRefreshDocuments() {
+  if (!canLoadDocuments.value) {
+    return
+  }
+  await loadDocuments()
 }
 
 function handleGroupChange(groupId: number | null) {
@@ -273,14 +315,22 @@ async function handleUpload() {
   const contextVersion = documentContextVersion
   const contextKey = currentContextKey.value
   isUploading.value = true
+  uploadProgress.value = 0
+  uploadStage.value = 'hashing'
   uploadFeedback.value = ''
   uploadError.value = ''
 
   try {
-    const documentId = await uploadDocument({
-      groupId: currentGroupId.value,
-      file: selectedFile.value,
-    })
+    const documentId = await uploadDocumentWithResume(
+      currentGroupId.value,
+      selectedFile.value,
+      (payload) => {
+        if (isCurrentDocumentContext(contextVersion, contextKey)) {
+          uploadProgress.value = payload.percent
+          uploadStage.value = payload.stage
+        }
+      },
+    )
     if (!isCurrentDocumentContext(contextVersion, contextKey)) {
       return
     }
@@ -294,6 +344,7 @@ async function handleUpload() {
   } finally {
     if (isCurrentDocumentContext(contextVersion, contextKey)) {
       isUploading.value = false
+      uploadStage.value = 'idle'
     }
   }
 }
@@ -328,6 +379,36 @@ async function handleDelete(documentId: number, fileName: string) {
       const nextDeletingIds = new Set(deletingDocumentIds.value)
       nextDeletingIds.delete(documentId)
       deletingDocumentIds.value = nextDeletingIds
+    }
+  }
+}
+
+async function handleRetryIngestion(item: DocumentItem) {
+  if (!canManageCurrentGroup.value || currentGroupId.value === null || item.status !== 'FAILED') {
+    return
+  }
+
+  const contextVersion = documentContextVersion
+  const contextKey = currentContextKey.value
+  retryingDocumentIds.value = new Set(retryingDocumentIds.value).add(item.documentId)
+  documentsError.value = ''
+
+  try {
+    await retryDocumentIngestion(item.documentId, currentGroupId.value)
+    if (!isCurrentDocumentContext(contextVersion, contextKey)) {
+      return
+    }
+    uploadFeedback.value = `文档「${item.fileName}」已重新进入处理队列。`
+    await loadDocuments()
+  } catch (error) {
+    if (isCurrentDocumentContext(contextVersion, contextKey)) {
+      documentsError.value = extractApiError(error, '重新处理文档失败')
+    }
+  } finally {
+    if (isCurrentDocumentContext(contextVersion, contextKey)) {
+      const nextRetryingIds = new Set(retryingDocumentIds.value)
+      nextRetryingIds.delete(item.documentId)
+      retryingDocumentIds.value = nextRetryingIds
     }
   }
 }
@@ -414,9 +495,92 @@ function isActivePreviewRequest(contextVersion: number, contextKey: string, requ
   )
 }
 
+function clearDocumentPollingTimer() {
+  if (pollingTimer !== null) {
+    window.clearTimeout(pollingTimer)
+    pollingTimer = null
+  }
+}
+
+function stopDocumentPolling() {
+  clearDocumentPollingTimer()
+  isPollingDocuments.value = false
+}
+
+function syncDocumentPolling() {
+  clearDocumentPollingTimer()
+  if (!canLoadDocuments.value || currentGroupId.value === null || !hasPendingDocuments.value) {
+    isPollingDocuments.value = false
+    return
+  }
+  pollingTimer = window.setTimeout(() => {
+    if (!canLoadDocuments.value || currentGroupId.value === null) {
+      stopDocumentPolling()
+      return
+    }
+    void loadDocuments({ silent: true })
+  }, DOCUMENT_POLL_INTERVAL_MS)
+}
+
+function syncPollingFeedback(previousDocuments: DocumentItem[], nextDocuments: DocumentItem[]) {
+  const transitionedDocument = findPollingTransitionedDocument(previousDocuments, nextDocuments)
+  if (transitionedDocument === null) {
+    return
+  }
+
+  if (transitionedDocument.status === 'READY') {
+    uploadFeedback.value = `文档「${transitionedDocument.fileName}」已处理完成。`
+    return
+  }
+
+  if (transitionedDocument.status === 'FAILED') {
+    uploadFeedback.value = `文档「${transitionedDocument.fileName}」处理失败，可点击“重试处理”。`
+  }
+}
+
+function findPollingTransitionedDocument(
+  previousDocuments: DocumentItem[],
+  nextDocuments: DocumentItem[],
+): DocumentItem | null {
+  const previousStatusMap = new Map(previousDocuments.map((item) => [item.documentId, item.status]))
+
+  for (const item of nextDocuments) {
+    const previousStatus = previousStatusMap.get(item.documentId)
+    if (!isPendingDocumentStatus(previousStatus) || !isTerminalDocumentStatus(item.status)) {
+      continue
+    }
+    return item
+  }
+
+  return null
+}
+
+function isPendingDocumentStatus(status: string | undefined) {
+  return status === 'UPLOADED' || status === 'PROCESSING'
+}
+
+function isTerminalDocumentStatus(status: string) {
+  return status === 'READY' || status === 'FAILED'
+}
+
 function describeDocumentRow(item: DocumentItem) {
   return item.contentType ?? item.fileExt ?? '未知类型'
 }
+
+const uploadStageText = computed(() => {
+  switch (uploadStage.value) {
+    case 'hashing':
+      return '正在计算文件指纹...'
+    case 'checking':
+      return '正在检查秒传与续传状态...'
+    case 'uploading':
+      return `正在上传分片：${uploadProgress.value}%`
+    case 'completing':
+      return '分片已完成，正在提交合并...'
+    default:
+      return ''
+  }
+})
 </script>
 
 <template>
@@ -435,6 +599,15 @@ function describeDocumentRow(item: DocumentItem) {
           <p v-if="uploadFeedback" class="feedback feedback--success">{{ uploadFeedback }}</p>
           <p v-if="uploadError" class="feedback feedback--error">{{ uploadError }}</p>
           <p v-if="documentsError" class="feedback feedback--error">{{ documentsError }}</p>
+          <div v-if="isUploading" class="document-upload-progress">
+            <div class="document-upload-progress__meta">
+              <strong>{{ selectedFileName }}</strong>
+              <span>{{ uploadStageText }}</span>
+            </div>
+            <div class="document-upload-progress__bar">
+              <div class="document-upload-progress__value" :style="{ width: `${uploadProgress}%` }"></div>
+            </div>
+          </div>
         </div>
 
         <DocumentPageToolbar
@@ -470,7 +643,20 @@ function describeDocumentRow(item: DocumentItem) {
               <p class="panel__eyebrow">筛选面板</p>
               <h2>筛选与结果</h2>
             </div>
-            <span class="panel__pill">{{ currentGroup ? currentGroup.groupName : '未选择知识库' }}</span>
+            <div class="documents-page__results-actions">
+              <span v-if="hasPendingDocuments" class="document-auto-refresh-hint">
+                {{ isPollingDocuments ? '自动刷新中...' : '检测到处理中内容，4 秒后自动刷新' }}
+              </span>
+              <button
+                type="button"
+                class="ghost-button"
+                :disabled="!canLoadDocuments || isLoading || isPollingDocuments"
+                @click="handleRefreshDocuments"
+              >
+                {{ isLoading ? '刷新中...' : '刷新列表' }}
+              </button>
+              <span class="panel__pill">{{ currentGroup ? currentGroup.groupName : '未选择知识库' }}</span>
+            </div>
           </div>
 
           <form class="document-filter-form" @submit.prevent="handleApplyFilters">
@@ -549,9 +735,17 @@ function describeDocumentRow(item: DocumentItem) {
                         {{ getPreviewButtonLabel(item, currentGroupRelation) }}
                       </button>
                       <button
+                        v-if="canManageCurrentGroup && item.status === 'FAILED'"
+                        class="ghost-button"
+                        :disabled="retryingDocumentIds.has(item.documentId)"
+                        @click="handleRetryIngestion(item)"
+                      >
+                        {{ retryingDocumentIds.has(item.documentId) ? '处理中...' : '重试处理' }}
+                      </button>
+                      <button
                         v-if="canManageCurrentGroup"
                         class="ghost-button ghost-button--danger"
-                        :disabled="deletingDocumentIds.has(item.documentId)"
+                        :disabled="deletingDocumentIds.has(item.documentId) || retryingDocumentIds.has(item.documentId)"
                         @click="handleDelete(item.documentId, item.fileName)"
                       >
                         {{ deletingDocumentIds.has(item.documentId) ? '删除中...' : '删除' }}

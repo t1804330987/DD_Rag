@@ -10,15 +10,13 @@ import com.dong.ddrag.document.model.vo.DocumentListItemVO;
 import com.dong.ddrag.document.model.vo.DocumentPreviewVO;
 import com.dong.ddrag.groupmembership.service.GroupMembershipService;
 import com.dong.ddrag.identity.service.CurrentUserService;
-import com.dong.ddrag.ingestion.mapper.DocumentChunkMapper;
-import com.dong.ddrag.ingestion.model.entity.DocumentChunkEntity;
-import com.dong.ddrag.ingestion.service.DocumentIngestionProcessor;
 import com.dong.ddrag.ingestion.vector.VectorIngestionService;
 import com.dong.ddrag.retrieval.elasticsearch.ElasticsearchChunkIndexService;
 import com.dong.ddrag.storage.service.ObjectStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,29 +44,26 @@ public class DocumentService {
     private final GroupMembershipService groupMembershipService;
     private final CurrentUserService currentUserService;
     private final ObjectStorageService objectStorageService;
-    private final DocumentIngestionProcessor documentIngestionProcessor;
-    private final DocumentChunkMapper documentChunkMapper;
     private final VectorIngestionService vectorIngestionService;
     private final ElasticsearchChunkIndexService elasticsearchChunkIndexService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public DocumentService(
             DocumentMapper documentMapper,
             GroupMembershipService groupMembershipService,
             CurrentUserService currentUserService,
             ObjectStorageService objectStorageService,
-            DocumentIngestionProcessor documentIngestionProcessor,
-            DocumentChunkMapper documentChunkMapper,
             VectorIngestionService vectorIngestionService,
-            ElasticsearchChunkIndexService elasticsearchChunkIndexService
+            ElasticsearchChunkIndexService elasticsearchChunkIndexService,
+            ApplicationEventPublisher applicationEventPublisher
     ) {
         this.documentMapper = documentMapper;
         this.groupMembershipService = groupMembershipService;
         this.currentUserService = currentUserService;
         this.objectStorageService = objectStorageService;
-        this.documentIngestionProcessor = documentIngestionProcessor;
-        this.documentChunkMapper = documentChunkMapper;
         this.vectorIngestionService = vectorIngestionService;
         this.elasticsearchChunkIndexService = elasticsearchChunkIndexService;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Transactional
@@ -86,17 +81,17 @@ public class DocumentService {
         uploadFile(bucket, objectKey, file);
         log.info("对象存储上传完成: groupId={}, objectKey={}", groupId, objectKey);
         try {
-            document = buildDocument(groupId, currentUser.userId(), file, fileName, fileExt, bucket, objectKey);
-            documentMapper.insert(document);
-            log.info("文档元数据入库完成: documentId={}, groupId={}, status={}",
-                    document.getId(), groupId, document.getStatus());
-            documentIngestionProcessor.process(document.getId(), groupId);
-            log.info("文档ETL处理完成: documentId={}, groupId={}", document.getId(), groupId);
-            syncSearchIndex(document);
-            log.info("文档 ES 索引同步完成: documentId={}, groupId={}", document.getId(), groupId);
-            markDocumentReady(document.getId(), groupId);
-            log.info("文档状态更新完成: documentId={}, groupId={}, status={}",
-                    document.getId(), groupId, DocumentStatus.READY.name());
+            document = persistAndFinalizeUploadedDocument(new FinalizedUploadCommand(
+                    groupId,
+                    currentUser.userId(),
+                    fileName,
+                    fileExt,
+                    normalizeContentType(file.getContentType()),
+                    file.getSize(),
+                    null,
+                    bucket,
+                    objectKey
+            ));
             return document.getId();
         } catch (RuntimeException exception) {
             log.error("文档上传链路失败: groupId={}, objectKey={}, reason={}",
@@ -105,6 +100,56 @@ public class DocumentService {
             compensateUploadedObject(bucket, objectKey, exception);
             throw exception;
         }
+    }
+
+    @Transactional
+    public Long createInstantUploadedDocument(
+            Long groupId,
+            Long userId,
+            DocumentEntity existingDocument,
+            String fileName
+    ) {
+        if (existingDocument == null) {
+            throw new BusinessException("复用文档不存在");
+        }
+        DocumentEntity document = persistAndFinalizeUploadedDocument(new FinalizedUploadCommand(
+                requireGroupId(groupId),
+                requirePositiveUserId(userId),
+                validateReusableFileName(fileName),
+                requireText(existingDocument.getFileExt(), "文件扩展名非法"),
+                normalizeContentType(existingDocument.getContentType()),
+                requirePositiveFileSize(existingDocument.getFileSize()),
+                existingDocument.getFileHash(),
+                requireText(existingDocument.getStorageBucket(), "对象存储桶非法"),
+                requireText(existingDocument.getStorageObjectKey(), "对象存储路径非法")
+        ));
+        return document.getId();
+    }
+
+    @Transactional
+    public Long finalizeUploadedDocument(
+            Long groupId,
+            Long userId,
+            String fileName,
+            String fileExt,
+            String contentType,
+            Long fileSize,
+            String fileHash,
+            String bucket,
+            String objectKey
+    ) {
+        DocumentEntity document = persistAndFinalizeUploadedDocument(new FinalizedUploadCommand(
+                requireGroupId(groupId),
+                requirePositiveUserId(userId),
+                normalizeFileName(fileName),
+                requireText(fileExt, "文件扩展名非法"),
+                normalizeContentType(contentType),
+                requirePositiveFileSize(fileSize),
+                fileHash,
+                requireText(bucket, "对象存储桶非法"),
+                requireText(objectKey, "对象存储路径非法")
+        ));
+        return document.getId();
     }
 
     public List<DocumentListItemVO> listDocuments(HttpServletRequest request, DocumentQuery query) {
@@ -122,6 +167,33 @@ public class DocumentService {
         }
         vectorIngestionService.deleteDocumentVectors(documentId);
         elasticsearchChunkIndexService.deleteDocumentChunks(documentId);
+    }
+
+    @Transactional
+    public void retryFailedDocumentIngestion(HttpServletRequest request, Long groupId, Long documentId) {
+        Long requiredGroupId = requireGroupId(groupId);
+        requireGroupOwner(request, requiredGroupId);
+        if (documentId == null || documentId <= 0) {
+            throw new BusinessException("文档ID非法");
+        }
+        DocumentEntity document = documentMapper.selectByIdAndGroupId(documentId, requiredGroupId);
+        if (document == null) {
+            throw new BusinessException("文档不存在或已删除");
+        }
+        if (!DocumentStatus.FAILED.name().equals(document.getStatus())) {
+            throw new BusinessException("仅失败文档支持重新处理");
+        }
+        int updated = documentMapper.updateStatus(
+                documentId,
+                requiredGroupId,
+                DocumentStatus.PROCESSING.name(),
+                null,
+                null
+        );
+        if (updated == 0) {
+            throw new BusinessException("重置文档状态失败");
+        }
+        publishIngestionRequestedEvent(documentId, requiredGroupId);
     }
 
     public DocumentPreviewVO previewDocument(HttpServletRequest request, Long groupId, Long documentId) {
@@ -172,15 +244,7 @@ public class DocumentService {
 
     private String extractFileName(MultipartFile file) {
         String originalFileName = file.getOriginalFilename();
-        if (!StringUtils.hasText(originalFileName)) {
-            throw new BusinessException("文件名非法");
-        }
-        String normalizedFileName = StringUtils.cleanPath(originalFileName);
-        String fileName = normalizedFileName.substring(normalizedFileName.lastIndexOf('/') + 1);
-        if (!StringUtils.hasText(fileName) || fileName.length() > MAX_FILE_NAME_LENGTH) {
-            throw new BusinessException("文件名非法");
-        }
-        return fileName;
+        return normalizeFileName(originalFileName);
     }
 
     private String extractFileExt(String fileName) {
@@ -248,9 +312,18 @@ public class DocumentService {
         }
     }
 
-    private void syncSearchIndex(DocumentEntity document) {
-        List<DocumentChunkEntity> chunks = documentChunkMapper.selectByDocumentId(document.getId());
-        elasticsearchChunkIndexService.indexReadyChunks(document.getFileName(), chunks);
+    private DocumentEntity persistAndFinalizeUploadedDocument(FinalizedUploadCommand command) {
+        DocumentEntity document = buildDocument(command);
+        documentMapper.insert(document);
+        log.info("文档元数据入库完成: documentId={}, groupId={}, status={}",
+                document.getId(), command.groupId(), document.getStatus());
+        publishIngestionRequestedEvent(document.getId(), command.groupId());
+        log.info("已发布文档异步ETL事件: documentId={}, groupId={}", document.getId(), command.groupId());
+        return document;
+    }
+
+    private void publishIngestionRequestedEvent(Long documentId, Long groupId) {
+        applicationEventPublisher.publishEvent(new DocumentIngestionRequestedEvent(documentId, groupId));
     }
 
     private String normalizeContentType(String contentType) {
@@ -261,19 +334,6 @@ public class DocumentService {
             throw new BusinessException("文件类型描述过长");
         }
         return contentType;
-    }
-
-    private void markDocumentReady(Long documentId, Long groupId) {
-        int updated = documentMapper.updateStatus(
-                documentId,
-                groupId,
-                DocumentStatus.READY.name(),
-                null,
-                LocalDateTime.now()
-        );
-        if (updated == 0) {
-            throw new BusinessException("文档入库成功但状态更新失败");
-        }
     }
 
     private DocumentQuery normalizeQuery(HttpServletRequest request, DocumentQuery query) {
@@ -320,6 +380,40 @@ public class DocumentService {
         }
     }
 
+    private DocumentEntity buildDocument(FinalizedUploadCommand command) {
+        LocalDateTime now = LocalDateTime.now();
+        DocumentEntity document = new DocumentEntity();
+        document.setGroupId(command.groupId());
+        document.setUploaderUserId(command.userId());
+        document.setFileName(command.fileName());
+        document.setFileExt(command.fileExt());
+        document.setContentType(command.contentType());
+        document.setFileSize(command.fileSize());
+        document.setFileHash(command.fileHash());
+        document.setStorageBucket(command.bucket());
+        document.setStorageObjectKey(command.objectKey());
+        document.setStatus(DocumentStatus.PROCESSING.name());
+        document.setDeleted(false);
+        document.setUploadedAt(now);
+        document.setCreatedAt(now);
+        document.setUpdatedAt(now);
+        return document;
+    }
+
+    private Long requirePositiveUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException("userId 非法");
+        }
+        return userId;
+    }
+
+    private long requirePositiveFileSize(Long fileSize) {
+        if (fileSize == null || fileSize <= 0) {
+            throw new BusinessException("fileSize 非法");
+        }
+        return fileSize;
+    }
+
     private String trimPreviewText(String previewText) {
         if (!StringUtils.hasText(previewText) || previewText.length() <= PREVIEW_MAX_LENGTH) {
             return previewText;
@@ -327,30 +421,39 @@ public class DocumentService {
         return previewText.substring(0, PREVIEW_MAX_LENGTH);
     }
 
-    private DocumentEntity buildDocument(
+    private String validateReusableFileName(String fileName) {
+        return normalizeFileName(fileName);
+    }
+
+    private String requireText(String value, String message) {
+        if (!StringUtils.hasText(value)) {
+            throw new BusinessException(message);
+        }
+        return value.trim();
+    }
+
+    private String normalizeFileName(String rawFileName) {
+        if (!StringUtils.hasText(rawFileName)) {
+            throw new BusinessException("文件名非法");
+        }
+        String normalizedFileName = StringUtils.cleanPath(rawFileName.trim());
+        String fileName = normalizedFileName.substring(normalizedFileName.lastIndexOf('/') + 1);
+        if (!StringUtils.hasText(fileName) || fileName.length() > MAX_FILE_NAME_LENGTH) {
+            throw new BusinessException("文件名非法");
+        }
+        return fileName;
+    }
+
+    record FinalizedUploadCommand(
             Long groupId,
             Long userId,
-            MultipartFile file,
             String fileName,
             String fileExt,
+            String contentType,
+            Long fileSize,
+            String fileHash,
             String bucket,
             String objectKey
     ) {
-        LocalDateTime now = LocalDateTime.now();
-        DocumentEntity document = new DocumentEntity();
-        document.setGroupId(groupId);
-        document.setUploaderUserId(userId);
-        document.setFileName(fileName);
-        document.setFileExt(fileExt);
-        document.setContentType(normalizeContentType(file.getContentType()));
-        document.setFileSize(file.getSize());
-        document.setStorageBucket(bucket);
-        document.setStorageObjectKey(objectKey);
-        document.setStatus(DocumentStatus.PROCESSING.name());
-        document.setDeleted(false);
-        document.setUploadedAt(now);
-        document.setCreatedAt(now);
-        document.setUpdatedAt(now);
-        return document;
     }
 }

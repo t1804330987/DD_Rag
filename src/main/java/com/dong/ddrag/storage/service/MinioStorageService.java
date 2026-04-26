@@ -2,6 +2,8 @@ package com.dong.ddrag.storage.service;
 
 import com.dong.ddrag.common.exception.BusinessException;
 import io.minio.BucketExistsArgs;
+import io.minio.ComposeObjectArgs;
+import io.minio.ComposeSource;
 import io.minio.GetObjectArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -70,6 +73,28 @@ public class MinioStorageService implements ObjectStorageService {
             );
         } catch (Exception exception) {
             throw new BusinessException("对象存储上传失败", exception);
+        }
+    }
+
+    @Override
+    public void composeObject(String bucket, String targetObjectKey, List<String> sourceObjectKeys, String contentType) {
+        try {
+            ensureBucketExists(bucket);
+            List<ComposeSource> sources = sourceObjectKeys.stream()
+                    .map(sourceObjectKey -> ComposeSource.builder()
+                            .bucket(bucket)
+                            .object(sourceObjectKey)
+                            .build())
+                    .toList();
+            minioClient.composeObject(
+                    ComposeObjectArgs.builder()
+                            .bucket(bucket)
+                            .object(targetObjectKey)
+                            .sources(sources)
+                            .build()
+            );
+        } catch (Exception exception) {
+            throw new BusinessException("对象存储合并失败", exception);
         }
     }
 

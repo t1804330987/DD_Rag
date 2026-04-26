@@ -145,7 +145,7 @@ export function createDocumentActionItems(options: {
   }
 
   if (options.canManageCurrentGroup) {
-    return ['上传新文件', '查看 READY 文件预览', '删除异常或无效文件', '按状态与时间窗口收窄结果']
+    return ['上传新文件', '查看 READY 文件预览', '对 FAILED 文件执行重试处理', '按状态与时间窗口收窄结果']
   }
 
   return ['查看当前文件状态', '预览 READY 文件内容', '按状态与时间窗口缩小结果', '上传与删除仅由所有者执行']

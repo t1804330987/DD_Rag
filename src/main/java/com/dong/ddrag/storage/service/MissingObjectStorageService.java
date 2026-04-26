@@ -37,6 +37,11 @@ public class MissingObjectStorageService implements ObjectStorageService {
     }
 
     @Override
+    public void composeObject(String bucket, String targetObjectKey, java.util.List<String> sourceObjectKeys, String contentType) {
+        throw new BusinessException("对象存储未配置");
+    }
+
+    @Override
     public void deleteObject(String bucket, String objectKey) {
         throw new BusinessException("对象存储未配置");
     }
