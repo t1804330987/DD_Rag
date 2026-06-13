@@ -2,8 +2,6 @@
 
 > 一个面向“组织知识库 + AI 助手”的 Java RAG 实战项目。它不是简单的 ChatGPT 套壳，而是把权限隔离、文档入库、混合检索、证据约束、Agent 工具调用和 Docker 部署串成了一条完整工程链路。
 
-如果你正在找一个能写进简历、能讲清架构、能覆盖 Spring AI / Spring AI Alibaba 技术点的项目，DD_Rag 值得 Star。
-
 # 社区支持 
 
 学 AI , 上 L 站
