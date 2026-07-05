@@ -4,7 +4,8 @@ import com.dong.ddrag.assistant.mapper.AssistantMessageMapper;
 import com.dong.ddrag.assistant.mapper.AssistantSessionContextMapper;
 import com.dong.ddrag.assistant.mapper.AssistantSessionMapper;
 import com.dong.ddrag.assistant.memory.AssistantShortTermMemoryMaintenanceService;
-import com.dong.ddrag.assistant.memory.AssistantSessionSummaryService;
+import com.dong.ddrag.assistant.memory.runtime.AssistantRuntimeMemoryRenderer;
+import com.dong.ddrag.assistant.memory.runtime.AssistantRuntimeMemoryState;
 import com.dong.ddrag.assistant.model.dto.message.AssistantMessageCreateDTO;
 import com.dong.ddrag.assistant.model.entity.AssistantMessageEntity;
 import com.dong.ddrag.assistant.model.entity.AssistantSessionContextEntity;
@@ -33,8 +34,8 @@ public class AssistantConversationService {
     private final AssistantMessageMapper assistantMessageMapper;
     private final AssistantSessionContextMapper assistantSessionContextMapper;
     private final AssistantSessionMapper assistantSessionMapper;
-    private final AssistantSessionSummaryService assistantSessionSummaryService;
     private final AssistantShortTermMemoryMaintenanceService assistantShortTermMemoryMaintenanceService;
+    private final AssistantRuntimeMemoryRenderer assistantRuntimeMemoryRenderer;
     private final AssistantSessionService assistantSessionService;
     private final CurrentUserService currentUserService;
     private final ObjectMapper objectMapper;
@@ -43,8 +44,8 @@ public class AssistantConversationService {
             AssistantMessageMapper assistantMessageMapper,
             AssistantSessionContextMapper assistantSessionContextMapper,
             AssistantSessionMapper assistantSessionMapper,
-            AssistantSessionSummaryService assistantSessionSummaryService,
             AssistantShortTermMemoryMaintenanceService assistantShortTermMemoryMaintenanceService,
+            AssistantRuntimeMemoryRenderer assistantRuntimeMemoryRenderer,
             AssistantSessionService assistantSessionService,
             CurrentUserService currentUserService,
             ObjectMapper objectMapper
@@ -52,8 +53,8 @@ public class AssistantConversationService {
         this.assistantMessageMapper = assistantMessageMapper;
         this.assistantSessionContextMapper = assistantSessionContextMapper;
         this.assistantSessionMapper = assistantSessionMapper;
-        this.assistantSessionSummaryService = assistantSessionSummaryService;
         this.assistantShortTermMemoryMaintenanceService = assistantShortTermMemoryMaintenanceService;
+        this.assistantRuntimeMemoryRenderer = assistantRuntimeMemoryRenderer;
         this.assistantSessionService = assistantSessionService;
         this.currentUserService = currentUserService;
         this.objectMapper = objectMapper;
@@ -86,35 +87,35 @@ public class AssistantConversationService {
                 .sorted(Comparator.comparing(AssistantMessageEntity::getCreatedAt).thenComparing(AssistantMessageEntity::getId))
                 .map(this::toMessageVO)
                 .toList();
+        return buildConversationContext(sessionContext, recentMessages);
+    }
+
+    public AssistantConversationContext loadFullConversationContext(Long currentUserId, Long sessionId) {
+        AssistantSessionEntity session = requireOwnedSession(requireUserId(currentUserId), requireSessionId(sessionId));
+        AssistantSessionContextEntity sessionContext = assistantSessionContextMapper.selectBySessionId(session.getId());
+        List<AssistantMessageVO> messages = assistantMessageMapper.selectBySessionIdOrderByCreatedAt(session.getId()).stream()
+                .map(this::toMessageVO)
+                .toList();
+        return buildConversationContext(sessionContext, messages);
+    }
+
+    private AssistantConversationContext buildConversationContext(
+            AssistantSessionContextEntity sessionContext,
+            List<AssistantMessageVO> messages
+    ) {
         String compactSummary = normalizeOptionalText(sessionContext == null ? null : sessionContext.getCompactSummary());
         String sessionMemory = normalizeOptionalText(sessionContext == null ? null : sessionContext.getSessionMemory());
-        // 运行时上下文优先复用已沉淀的 summary / compact / session memory，避免每次都把全量消息塞给模型。
-        String summaryText = assistantSessionSummaryService.loadReusableSummary(session.getId(), session.getLastMessageAt());
-        if (summaryText != null) {
-            return new AssistantConversationContext(summaryText, compactSummary, sessionMemory, recentMessages);
-        }
-        Long totalMessages = assistantMessageMapper.countBySessionId(session.getId());
-        List<AssistantMessageEntity> allMessages = assistantMessageMapper.selectBySessionIdOrderByCreatedAt(session.getId());
-        int estimatedTokens = assistantSessionSummaryService.estimateTokens(allMessages);
-        if (assistantSessionSummaryService.shouldSummarize(
-                totalMessages == null ? 0 : totalMessages,
-                estimatedTokens,
-                session.getLastMessageAt()
-        )) {
-            String generatedSummary = assistantSessionSummaryService.summarizeAndPersist(session.getId(), allMessages, safeLimit);
-            return new AssistantConversationContext(generatedSummary, compactSummary, sessionMemory, recentMessages);
-        }
-        return new AssistantConversationContext(null, compactSummary, sessionMemory, recentMessages);
+        String runtimeMemoryBlock = renderRuntimeMemory(sessionContext);
+        return new AssistantConversationContext(runtimeMemoryBlock, compactSummary, sessionMemory, messages);
     }
 
     public AssistantConversationContextVO getConversationContext(
             HttpServletRequest request,
-            Long sessionId,
-            int recentLimit
+            Long sessionId
     ) {
         Long currentUserId = currentUserService.requireBusinessUser(request).userId();
-        AssistantConversationContext context = loadConversationContext(currentUserId, sessionId, recentLimit);
-        return new AssistantConversationContextVO(context.summaryText(), context.recentMessages());
+        AssistantConversationContext context = loadFullConversationContext(currentUserId, sessionId);
+        return new AssistantConversationContextVO(context.recentMessages());
     }
 
     private AssistantMessageVO saveMessage(
@@ -210,6 +211,22 @@ public class AssistantConversationService {
         return normalized.isEmpty() ? null : normalized;
     }
 
+    private String renderRuntimeMemory(AssistantSessionContextEntity sessionContext) {
+        if (sessionContext == null || sessionContext.getRuntimeMemoryState() == null
+                || sessionContext.getRuntimeMemoryState().isBlank()) {
+            return null;
+        }
+        try {
+            AssistantRuntimeMemoryState state = objectMapper.readValue(
+                    sessionContext.getRuntimeMemoryState(),
+                    AssistantRuntimeMemoryState.class
+            );
+            return normalizeOptionalText(assistantRuntimeMemoryRenderer.render(state));
+        } catch (JsonProcessingException exception) {
+            return null;
+        }
+    }
+
     private int normalizeLimit(int limit) {
         if (limit <= 0) {
             throw new BusinessException("limit 非法");
@@ -286,7 +303,7 @@ public class AssistantConversationService {
     }
 
     public record AssistantConversationContext(
-            String summaryText,
+            String runtimeMemoryBlock,
             String compactSummary,
             String sessionMemory,
             List<AssistantMessageVO> recentMessages

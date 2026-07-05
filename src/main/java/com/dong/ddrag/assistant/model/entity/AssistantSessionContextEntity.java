@@ -7,6 +7,7 @@ public class AssistantSessionContextEntity {
     private Long sessionId;
     private String sessionMemory;
     private String compactSummary;
+    private String runtimeMemoryState;
     private Long sessionMemoryBaseMessageId;
     private Long sessionMemoryRangeEndMessageId;
     private Long compactSummaryBaseMessageId;
@@ -36,6 +37,14 @@ public class AssistantSessionContextEntity {
 
     public void setCompactSummary(String compactSummary) {
         this.compactSummary = compactSummary;
+    }
+
+    public String getRuntimeMemoryState() {
+        return runtimeMemoryState;
+    }
+
+    public void setRuntimeMemoryState(String runtimeMemoryState) {
+        this.runtimeMemoryState = runtimeMemoryState;
     }
 
     public Long getSessionMemoryBaseMessageId() {
@@ -76,22 +85,6 @@ public class AssistantSessionContextEntity {
 
     public void setContextVersion(Long contextVersion) {
         this.contextVersion = contextVersion;
-    }
-
-    public String getSummaryText() {
-        return sessionMemory;
-    }
-
-    public void setSummaryText(String summaryText) {
-        this.sessionMemory = summaryText;
-    }
-
-    public Long getSourceMessageId() {
-        return sessionMemoryRangeEndMessageId;
-    }
-
-    public void setSourceMessageId(Long sourceMessageId) {
-        this.sessionMemoryRangeEndMessageId = sourceMessageId;
     }
 
     public LocalDateTime getUpdatedAt() {

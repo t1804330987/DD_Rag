@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Service
-public class HybridChunkRetrievalService {
+public class HybridEvidenceRetriever implements EvidenceRetriever {
 
     private static final int DEFAULT_NEIGHBOR_WINDOW = 1;
     private static final int CHANNEL_TOP_K = 50;
@@ -35,7 +35,7 @@ public class HybridChunkRetrievalService {
     private final int neighborWindow;
 
     @Autowired
-    public HybridChunkRetrievalService(
+    public HybridEvidenceRetriever(
             PgVectorRetrievalAdapter vectorRetrievalAdapter,
             ElasticsearchChunkIndexService elasticsearchChunkIndexService,
             DocumentChunkMapper documentChunkMapper,
@@ -50,7 +50,7 @@ public class HybridChunkRetrievalService {
         );
     }
 
-    public HybridChunkRetrievalService(
+    public HybridEvidenceRetriever(
             PgVectorRetrievalAdapter vectorRetrievalAdapter,
             ElasticsearchChunkIndexService elasticsearchChunkIndexService,
             DocumentChunkMapper documentChunkMapper,
@@ -64,10 +64,11 @@ public class HybridChunkRetrievalService {
         this.neighborWindow = Math.max(0, neighborWindow);
     }
 
+    @Override
     public RetrievedEvidenceBundle retrieve(Long groupId, String question, int topK) {
         Long validGroupId = requirePositiveGroupId(groupId);
         String normalizedQuestion = requireQuestion(question);
-        int validTopK = topK > 0 ? topK : 5;
+        int validTopK = topK > 0 ? topK : EvidenceRetriever.DEFAULT_TOP_K;
         QueryPlanResult queryPlan = queryPlanningService.plan(normalizedQuestion);
         Map<Long, RetrievalCandidate> candidates = new LinkedHashMap<>();
 

@@ -41,13 +41,8 @@ export async function deleteAssistantSession(sessionId: number): Promise<void> {
   }
 }
 
-export async function fetchAssistantConversationContext(
-  sessionId: number,
-  recentLimit = 12,
-): Promise<AssistantConversationContext> {
-  const { data } = await http.get<AssistantConversationContext>(`/assistant/sessions/${sessionId}/context`, {
-    params: { recentLimit },
-  })
+export async function fetchAssistantConversationContext(sessionId: number): Promise<AssistantConversationContext> {
+  const { data } = await http.get<AssistantConversationContext>(`/assistant/sessions/${sessionId}/context`)
   return data
 }
 

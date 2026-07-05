@@ -13,26 +13,25 @@ import java.util.List;
 @Component
 public class ReadyChunkDocumentRetriever implements DocumentRetriever {
 
-    private static final int DEFAULT_TOP_K = 5;
     private static final String GROUP_ID_CONTEXT_KEY = "groupId";
     public static final String PREFETCHED_DOCUMENTS_CONTEXT_KEY = "qaRetrievedDocuments";
 
-    private final HybridChunkRetrievalService hybridChunkRetrievalService;
+    private final EvidenceRetriever evidenceRetriever;
     private final int topK;
 
     @Autowired
     public ReadyChunkDocumentRetriever(
-            HybridChunkRetrievalService hybridChunkRetrievalService
+            EvidenceRetriever evidenceRetriever
     ) {
-        this(hybridChunkRetrievalService, DEFAULT_TOP_K);
+        this(evidenceRetriever, EvidenceRetriever.DEFAULT_TOP_K);
     }
 
     public ReadyChunkDocumentRetriever(
-            HybridChunkRetrievalService hybridChunkRetrievalService,
+            EvidenceRetriever evidenceRetriever,
             int topK
     ) {
-        this.hybridChunkRetrievalService = hybridChunkRetrievalService;
-        this.topK = topK > 0 ? topK : DEFAULT_TOP_K;
+        this.evidenceRetriever = evidenceRetriever;
+        this.topK = topK > 0 ? topK : EvidenceRetriever.DEFAULT_TOP_K;
     }
 
     @Override
@@ -51,7 +50,7 @@ public class ReadyChunkDocumentRetriever implements DocumentRetriever {
     }
 
     public RetrievedEvidenceBundle retrieveEvidence(Long groupId, String question) {
-        return hybridChunkRetrievalService.retrieve(groupId, question, topK);
+        return evidenceRetriever.retrieve(groupId, question, topK);
     }
 
     private Query requireQuery(Query query) {

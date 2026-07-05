@@ -3,7 +3,7 @@ package com.dong.ddrag.assistant.agent;
 import com.dong.ddrag.assistant.model.vo.tool.KnowledgeBaseSearchToolResponse;
 import com.dong.ddrag.common.exception.BusinessException;
 import com.dong.ddrag.qa.model.vo.AskQuestionResponse;
-import com.dong.ddrag.qa.rag.ReadyChunkDocumentRetriever;
+import com.dong.ddrag.qa.rag.EvidenceRetriever;
 import com.dong.ddrag.qa.rag.RetrievedEvidenceBundle;
 import com.dong.ddrag.qa.support.CitationAssembler;
 import org.springframework.ai.chat.model.ToolContext;
@@ -26,14 +26,14 @@ public class AssistantKnowledgeBaseTool {
     private static final String INSUFFICIENT_CODE = "INSUFFICIENT_EVIDENCE";
     private static final String INSUFFICIENT_MESSAGE = "检索到的有效证据不足，暂不回答。";
 
-    private final ReadyChunkDocumentRetriever readyChunkDocumentRetriever;
+    private final EvidenceRetriever evidenceRetriever;
     private final CitationAssembler citationAssembler;
 
     public AssistantKnowledgeBaseTool(
-            ReadyChunkDocumentRetriever readyChunkDocumentRetriever,
+            EvidenceRetriever evidenceRetriever,
             CitationAssembler citationAssembler
     ) {
-        this.readyChunkDocumentRetriever = readyChunkDocumentRetriever;
+        this.evidenceRetriever = evidenceRetriever;
         this.citationAssembler = citationAssembler;
     }
 
@@ -59,7 +59,7 @@ public class AssistantKnowledgeBaseTool {
             );
         }
         String safeQuery = requireQuery(query);
-        RetrievedEvidenceBundle evidenceBundle = readyChunkDocumentRetriever.retrieveEvidence(groupId, safeQuery);
+        RetrievedEvidenceBundle evidenceBundle = evidenceRetriever.retrieve(groupId, safeQuery);
         List<Document> documents = evidenceBundle.documents();
         if (documents == null || documents.isEmpty()) {
             resultHolder.recordCitations(List.of());

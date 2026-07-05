@@ -8,6 +8,7 @@
         <id property="sessionId" column="session_id"/>
         <result property="sessionMemory" column="session_memory"/>
         <result property="compactSummary" column="compact_summary"/>
+        <result property="runtimeMemoryState" column="runtime_memory_state"/>
         <result property="sessionMemoryBaseMessageId" column="session_memory_base_message_id"/>
         <result property="sessionMemoryRangeEndMessageId" column="session_memory_range_end_message_id"/>
         <result property="compactSummaryBaseMessageId" column="compact_summary_base_message_id"/>
@@ -20,6 +21,7 @@
         select session_id,
                session_memory,
                compact_summary,
+               runtime_memory_state,
                session_memory_base_message_id,
                session_memory_range_end_message_id,
                compact_summary_base_message_id,
@@ -35,6 +37,7 @@
             session_id,
             session_memory,
             compact_summary,
+            runtime_memory_state,
             session_memory_base_message_id,
             session_memory_range_end_message_id,
             compact_summary_base_message_id,
@@ -45,6 +48,7 @@
             #{sessionId},
             #{sessionMemory},
             #{compactSummary},
+            #{runtimeMemoryState},
             #{sessionMemoryBaseMessageId},
             #{sessionMemoryRangeEndMessageId},
             #{compactSummaryBaseMessageId},
@@ -55,6 +59,10 @@
         on conflict (session_id) do update
         set session_memory = excluded.session_memory,
             compact_summary = coalesce(excluded.compact_summary, assistant_session_contexts.compact_summary),
+            runtime_memory_state = coalesce(
+                excluded.runtime_memory_state,
+                assistant_session_contexts.runtime_memory_state
+            ),
             session_memory_base_message_id = coalesce(
                 excluded.session_memory_base_message_id,
                 assistant_session_contexts.session_memory_base_message_id
@@ -79,6 +87,7 @@
         update assistant_session_contexts
         set session_memory = #{context.sessionMemory},
             compact_summary = #{context.compactSummary},
+            runtime_memory_state = #{context.runtimeMemoryState},
             session_memory_base_message_id = #{context.sessionMemoryBaseMessageId},
             session_memory_range_end_message_id = #{context.sessionMemoryRangeEndMessageId},
             compact_summary_base_message_id = #{context.compactSummaryBaseMessageId},

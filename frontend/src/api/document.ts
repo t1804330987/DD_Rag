@@ -39,7 +39,6 @@ export interface DocumentPreview {
 interface UploadDocumentPayload {
   groupId: number
   file: File
-  onProgress?: (loadedBytes: number, totalBytes?: number) => void
 }
 
 export interface InitDocumentUploadPayload {
@@ -105,11 +104,7 @@ export async function uploadDocument(payload: UploadDocumentPayload): Promise<nu
   formData.append('groupId', String(payload.groupId))
   formData.append('file', payload.file)
 
-  const { data } = await http.post<ApiResponse<number>>('/documents/upload', formData, {
-    onUploadProgress: (event) => {
-      payload.onProgress?.(event.loaded, event.total)
-    },
-  })
+  const { data } = await http.post<ApiResponse<number>>('/documents/upload', formData)
 
   if (!data.success || typeof data.data !== 'number') {
     throw new Error(data.message ?? '上传文件失败')

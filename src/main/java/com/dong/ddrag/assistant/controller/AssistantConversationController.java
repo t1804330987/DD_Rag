@@ -6,7 +6,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -22,9 +21,8 @@ public class AssistantConversationController {
     @GetMapping("/{sessionId}/context")
     public AssistantConversationContextVO getConversationContext(
             @PathVariable Long sessionId,
-            @RequestParam(defaultValue = "12") int recentLimit,
             HttpServletRequest request
     ) {
-        return assistantConversationService.getConversationContext(request, sessionId, recentLimit);
+        return assistantConversationService.getConversationContext(request, sessionId);
     }
 }

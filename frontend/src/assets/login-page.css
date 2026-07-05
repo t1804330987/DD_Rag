@@ -153,11 +153,6 @@
   color: #244965;
   font-weight: 700;
   text-decoration: none;
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  font: inherit;
 }
 
 .auth-page-link:hover,

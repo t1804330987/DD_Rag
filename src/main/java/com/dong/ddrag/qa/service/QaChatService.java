@@ -3,6 +3,7 @@ package com.dong.ddrag.qa.service;
 import com.dong.ddrag.qa.model.KnowledgeAnswerOutput;
 import com.dong.ddrag.qa.model.EvidenceLevel;
 import com.dong.ddrag.qa.model.vo.AskQuestionResponse;
+import com.dong.ddrag.qa.rag.EvidenceRetriever;
 import com.dong.ddrag.qa.rag.ReadyChunkDocumentRetriever;
 import com.dong.ddrag.qa.rag.RetrievedEvidenceBundle;
 import com.dong.ddrag.qa.support.CitationAssembler;
@@ -31,26 +32,26 @@ public class QaChatService {
 
     private final ChatClient qaChatClient;
     private final PromptTemplate qaUserPromptTemplate;
-    private final ReadyChunkDocumentRetriever documentRetriever;
+    private final EvidenceRetriever evidenceRetriever;
     private final QaAnswerParser answerParser;
     private final CitationAssembler citationAssembler;
 
     public QaChatService(
             ChatClient qaChatClient,
             @Qualifier("qaUserPromptTemplate") PromptTemplate qaUserPromptTemplate,
-            ReadyChunkDocumentRetriever documentRetriever,
+            EvidenceRetriever evidenceRetriever,
             QaAnswerParser answerParser,
             CitationAssembler citationAssembler
     ) {
         this.qaChatClient = qaChatClient;
         this.qaUserPromptTemplate = qaUserPromptTemplate;
-        this.documentRetriever = documentRetriever;
+        this.evidenceRetriever = evidenceRetriever;
         this.answerParser = answerParser;
         this.citationAssembler = citationAssembler;
     }
 
     public AskQuestionResponse ask(Long groupId, String question) {
-        RetrievedEvidenceBundle evidenceBundle = documentRetriever.retrieveEvidence(groupId, question);
+        RetrievedEvidenceBundle evidenceBundle = evidenceRetriever.retrieve(groupId, question);
         List<Document> documents = evidenceBundle.documents();
         if (documents.isEmpty()) {
             return AskQuestionResponse.unanswered(INSUFFICIENT_CODE, INSUFFICIENT_MESSAGE, List.of());

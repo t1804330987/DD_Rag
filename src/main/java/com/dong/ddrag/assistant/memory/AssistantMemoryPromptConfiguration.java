@@ -32,4 +32,12 @@ public class AssistantMemoryPromptConfiguration {
                 .resource(new ClassPathResource("prompts/assistant/runtime-compact-summary.st"))
                 .build();
     }
+
+    @Bean
+    @Qualifier("assistantRuntimeMemoryExtractionPromptTemplate")
+    public PromptTemplate assistantRuntimeMemoryExtractionPromptTemplate() {
+        return PromptTemplate.builder()
+                .resource(new ClassPathResource("prompts/assistant/runtime-memory-extraction.st"))
+                .build();
+    }
 }

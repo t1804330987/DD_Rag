@@ -37,7 +37,6 @@ export interface AssistantMessageItem {
 }
 
 export interface AssistantConversationContext {
-  summaryText: string | null
   recentMessages: AssistantMessageItem[]
 }
 

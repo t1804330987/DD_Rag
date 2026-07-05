@@ -168,7 +168,7 @@ async function loadConversation(sessionId: number) {
   try {
     const [detail, context] = await Promise.all([
       fetchAssistantSessionDetail(sessionId),
-      fetchAssistantConversationContext(sessionId, 12),
+      fetchAssistantConversationContext(sessionId),
     ])
     selectedSessionTitle.value = detail.title
     conversationContext.value = context

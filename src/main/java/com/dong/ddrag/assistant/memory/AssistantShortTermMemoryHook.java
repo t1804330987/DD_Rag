@@ -67,8 +67,7 @@ public class AssistantShortTermMemoryHook extends MessagesModelHook {
                     summarizeMessages(previousMessages)
             );
         }
-        // 这里不是在原 messages 上做增量补丁，而是直接重建一份真正送进模型的上下文：
-        // compact summary -> session memory -> recent messages -> current question。
+        // 这里不是在原 messages 上做增量补丁，而是直接重建一份真正送进模型的上下文。
         List<Message> assembledMessages = assembleBeforeModelMessages(
                 userId,
                 sessionId,
@@ -126,8 +125,7 @@ public class AssistantShortTermMemoryHook extends MessagesModelHook {
         List<Message> messages = new ArrayList<>();
         AssistantConversationService.AssistantConversationContext conversationContext =
                 assistantConversationService.loadConversationContext(userId, sessionId, RECENT_MESSAGE_LIMIT);
-        // compact summary 和 session memory 被降级成系统消息注入，
-        // 目的是让模型先看到压缩后的会话状态，再看最近几轮原始消息。
+        addSystemMemory(messages, "runtime memory", conversationContext.runtimeMemoryBlock());
         addSystemMemory(messages, "compact summary", conversationContext.compactSummary());
         addSystemMemory(messages, "session memory", conversationContext.sessionMemory());
         appendRecentMessages(messages, conversationContext.recentMessages(), currentQuestion);

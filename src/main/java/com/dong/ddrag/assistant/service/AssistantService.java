@@ -1,6 +1,7 @@
 package com.dong.ddrag.assistant.service;
 
 import com.dong.ddrag.assistant.agent.AssistantAgentFacade;
+import com.dong.ddrag.assistant.memory.runtime.AssistantRuntimeMemoryService;
 import com.dong.ddrag.assistant.model.dto.chat.AssistantChatRequest;
 import com.dong.ddrag.assistant.model.dto.message.AssistantMessageCreateDTO;
 import com.dong.ddrag.assistant.model.vo.chat.AssistantAgentResult;
@@ -14,7 +15,6 @@ import com.dong.ddrag.identity.service.CurrentUserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -24,6 +24,7 @@ public class AssistantService {
 
     private final AssistantConversationService assistantConversationService;
     private final AssistantAgentFacade assistantAgentFacade;
+    private final AssistantRuntimeMemoryService assistantRuntimeMemoryService;
     private final GroupMembershipService groupMembershipService;
     private final CurrentUserService currentUserService;
     private final ObjectMapper objectMapper;
@@ -31,32 +32,53 @@ public class AssistantService {
     public AssistantService(
             AssistantConversationService assistantConversationService,
             AssistantAgentFacade assistantAgentFacade,
+            AssistantRuntimeMemoryService assistantRuntimeMemoryService,
             GroupMembershipService groupMembershipService,
             CurrentUserService currentUserService,
             ObjectMapper objectMapper
     ) {
         this.assistantConversationService = assistantConversationService;
         this.assistantAgentFacade = assistantAgentFacade;
+        this.assistantRuntimeMemoryService = assistantRuntimeMemoryService;
         this.groupMembershipService = groupMembershipService;
         this.currentUserService = currentUserService;
         this.objectMapper = objectMapper;
     }
 
-    @Transactional
     public AssistantChatResponse chat(HttpServletRequest request, AssistantChatRequest chatRequest) {
         CurrentUserService.CurrentUser currentUser = currentUserService.requireBusinessUser(request);
         AssistantChatRequest safeRequest = requireChatRequest(chatRequest);
 
-        // 仅对话模式先落用户消息，再调模型，这样后续 hook 可以基于最新会话状态重建上下文。
-        saveUserMessage(currentUser.userId(), safeRequest);
+        AssistantMessageVO userMessage = saveUserMessage(currentUser.userId(), safeRequest);
+        AssistantRuntimeMemoryService.AssistantRuntimeMemoryDecision memoryDecision = beforeAnswer(
+                currentUser.userId(),
+                safeRequest,
+                userMessage.messageId()
+        );
+        if (memoryDecision.requiresConfirmation()) {
+            AssistantMessageVO assistantMessage = saveAssistantMessage(
+                    currentUser.userId(),
+                    safeRequest,
+                    new AssistantExecutionResult(memoryDecision.assistantReply(), null, List.of())
+            );
+            return new AssistantChatResponse(
+                    safeRequest.sessionId(),
+                    assistantMessage.messageId(),
+                    assistantMessage.content(),
+                    safeRequest.toolMode(),
+                    safeRequest.groupId(),
+                    List.of()
+            );
+        }
+        AssistantChatRequest effectiveRequest = withMessage(safeRequest, memoryDecision.effectiveUserMessage());
         AssistantExecutionResult executionResult = executeAssistant(
                 request,
                 currentUser.userId(),
-                safeRequest
+                effectiveRequest
         );
         AssistantMessageVO assistantMessage = saveAssistantMessage(
                 currentUser.userId(),
-                safeRequest,
+                effectiveRequest,
                 executionResult
         );
         return new AssistantChatResponse(
@@ -69,24 +91,22 @@ public class AssistantService {
         );
     }
 
-    @Transactional
     public void streamChat(
             HttpServletRequest request,
             AssistantChatRequest chatRequest,
             AssistantStreamEventEmitter eventEmitter
     ) {
-        streamChat(request, chatRequest, eventEmitter, deltaEmitter ->
+        streamChat(request, chatRequest, eventEmitter, (deltaEmitter, effectiveUserMessage) ->
                 assistantAgentFacade.streamChat(
                         currentUserService.requireBusinessUser(request).userId(),
                         chatRequest.sessionId(),
                         chatRequest.toolMode(),
                         chatRequest.groupId(),
-                        chatRequest.message(),
+                        effectiveUserMessage,
                         deltaEmitter
                 ));
     }
 
-    @Transactional
     public void streamChat(
             HttpServletRequest request,
             AssistantChatRequest chatRequest,
@@ -95,23 +115,47 @@ public class AssistantService {
     ) {
         CurrentUserService.CurrentUser currentUser = currentUserService.requireBusinessUser(request);
         AssistantChatRequest safeRequest = requireChatRequest(chatRequest);
-        // 流式场景和同步场景共享同一条主链，只是把模型回复拆成 delta 逐步回传给前端。
-        // 用户消息是先落库，再调模型。
-        saveUserMessage(currentUser.userId(), safeRequest);
+        AssistantMessageVO userMessage = saveUserMessage(currentUser.userId(), safeRequest);
+        AssistantRuntimeMemoryService.AssistantRuntimeMemoryDecision memoryDecision = beforeAnswer(
+                currentUser.userId(),
+                safeRequest,
+                userMessage.messageId()
+        );
 
-        // 告诉前端：流式回答开始了
         eventEmitter.emit(AssistantChatStreamEvent.start(
                 safeRequest.sessionId(),
                 safeRequest.toolMode(),
                 safeRequest.groupId()
         ));
 
+        if (memoryDecision.requiresConfirmation()) {
+            eventEmitter.emit(AssistantChatStreamEvent.delta(
+                    safeRequest.sessionId(),
+                    safeRequest.toolMode(),
+                    safeRequest.groupId(),
+                    memoryDecision.assistantReply()
+            ));
+            AssistantMessageVO assistantMessage = saveAssistantMessage(
+                    currentUser.userId(),
+                    safeRequest,
+                    new AssistantExecutionResult(memoryDecision.assistantReply(), null, List.of())
+            );
+            eventEmitter.emit(AssistantChatStreamEvent.done(
+                    safeRequest.sessionId(),
+                    safeRequest.toolMode(),
+                    safeRequest.groupId(),
+                    assistantMessage.messageId(),
+                    memoryDecision.assistantReply(),
+                    List.of()
+            ));
+            return;
+        }
 
+        AssistantChatRequest effectiveRequest = withMessage(safeRequest, memoryDecision.effectiveUserMessage());
         AssistantExecutionResult executionResult = executeAssistantStreaming(
                 request,
                 currentUser.userId(),
-                safeRequest,
-                // 每当模型吐出一小段文本 delta, 包装为AssistantChatStreamEvent.delta()，再通过 eventEmitter.emit(...) 发给前端
+                effectiveRequest,
                 delta -> eventEmitter.emit(AssistantChatStreamEvent.delta(
                         safeRequest.sessionId(),
                         safeRequest.toolMode(),
@@ -123,7 +167,7 @@ public class AssistantService {
         // 保存助手回复
         AssistantMessageVO assistantMessage = saveAssistantMessage(
                 currentUser.userId(),
-                safeRequest,
+                effectiveRequest,
                 executionResult
         );
 
@@ -149,6 +193,33 @@ public class AssistantService {
             throw new BusinessException("KB_SEARCH 模式必须传 groupId");
         }
         return chatRequest;
+    }
+
+    private AssistantRuntimeMemoryService.AssistantRuntimeMemoryDecision beforeAnswer(
+            Long userId,
+            AssistantChatRequest safeRequest,
+            Long userMessageId
+    ) {
+        return assistantRuntimeMemoryService.beforeAnswer(
+                userId,
+                safeRequest.sessionId(),
+                userMessageId,
+                safeRequest.toolMode(),
+                safeRequest.groupId(),
+                safeRequest.message()
+        );
+    }
+
+    private AssistantChatRequest withMessage(AssistantChatRequest request, String effectiveUserMessage) {
+        String message = effectiveUserMessage == null || effectiveUserMessage.isBlank()
+                ? request.message()
+                : effectiveUserMessage;
+        return new AssistantChatRequest(
+                request.sessionId(),
+                message,
+                request.toolMode(),
+                request.groupId()
+        );
     }
 
     private AssistantExecutionResult executeAssistant(
@@ -177,16 +248,16 @@ public class AssistantService {
     ) {
         if (safeRequest.toolMode() == AssistantToolMode.CHAT) {
             // 仅对话流式模式下，delta 直接来自 AgentFacade.streamChat 的模型流输出。
-            AssistantAgentResult agentResult = streamExecutor.execute(deltaConsumer);
+            AssistantAgentResult agentResult = streamExecutor.execute(deltaConsumer, safeRequest.message());
             return new AssistantExecutionResult(agentResult.reply(), null, agentResult.citations());
         }
         requireKnowledgeBaseReadableIfNeeded(request, safeRequest);
-        AssistantAgentResult agentResult = streamExecutor.execute(deltaConsumer);
+        AssistantAgentResult agentResult = streamExecutor.execute(deltaConsumer, safeRequest.message());
         return new AssistantExecutionResult(agentResult.reply(), null, agentResult.citations());
     }
 
-    private void saveUserMessage(Long userId, AssistantChatRequest safeRequest) {
-        assistantConversationService.saveUserMessage(
+    private AssistantMessageVO saveUserMessage(Long userId, AssistantChatRequest safeRequest) {
+        return assistantConversationService.saveUserMessage(
                 userId,
                 new AssistantMessageCreateDTO(
                         safeRequest.sessionId(),
@@ -231,6 +302,6 @@ public class AssistantService {
     @FunctionalInterface
     public interface ChatStreamExecutor {
 
-        AssistantAgentResult execute(Consumer<String> deltaConsumer);
+        AssistantAgentResult execute(Consumer<String> deltaConsumer, String effectiveUserMessage);
     }
 }
