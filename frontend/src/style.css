@@ -1,4 +1,5 @@
 @import './assets/workbench-shell.css';
+@import './assets/markdown-content.css';
 
 :root {
   font-family: var(--wb-font-body);

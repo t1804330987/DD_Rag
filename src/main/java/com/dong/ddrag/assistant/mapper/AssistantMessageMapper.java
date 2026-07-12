@@ -11,6 +11,8 @@ public interface AssistantMessageMapper {
 
     int insert(AssistantMessageEntity assistantMessageEntity);
 
+    AssistantMessageEntity selectById(@Param("messageId") Long messageId);
+
     Long countBySessionId(@Param("sessionId") Long sessionId);
 
     List<AssistantMessageEntity> selectBySessionIdOrderByCreatedAt(@Param("sessionId") Long sessionId);

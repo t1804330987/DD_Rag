@@ -1,6 +1,7 @@
 package com.dong.ddrag.qa;
 
 import com.dong.ddrag.groupmembership.service.GroupMembershipService;
+import com.dong.ddrag.identity.service.CurrentUserService;
 import com.dong.ddrag.qa.model.dto.AskQuestionRequest;
 import com.dong.ddrag.qa.model.vo.AskQuestionResponse;
 import com.dong.ddrag.qa.service.QaChatService;
@@ -19,7 +20,8 @@ class QaServiceTest {
     void shouldRequireReadablePermissionBeforeAsking() {
         GroupMembershipService groupMembershipService = mock(GroupMembershipService.class);
         QaChatService qaChatService = mock(QaChatService.class);
-        QaService qaService = new QaService(groupMembershipService, qaChatService);
+        CurrentUserService currentUserService = mock(CurrentUserService.class);
+        QaService qaService = new QaService(groupMembershipService, qaChatService, currentUserService);
         HttpServletRequest request = mock(HttpServletRequest.class);
         AskQuestionRequest askQuestionRequest = new AskQuestionRequest();
         askQuestionRequest.setGroupId(2001L);
@@ -31,12 +33,14 @@ class QaServiceTest {
                 null,
                 java.util.List.of()
         );
-        when(qaChatService.ask(2001L, "产品团队如何安排迭代？")).thenReturn(expected);
+        when(currentUserService.requireBusinessUser(request)).thenReturn(new CurrentUserService.CurrentUser(7L, "u7", "用户"));
+        when(qaChatService.ask(7L, 2001L, "产品团队如何安排迭代？")).thenReturn(expected);
 
         AskQuestionResponse actual = qaService.ask(request, askQuestionRequest);
 
         assertThat(actual).isEqualTo(expected);
         verify(groupMembershipService).requireGroupReadable(request, 2001L);
-        verify(qaChatService).ask(2001L, "产品团队如何安排迭代？");
+        verify(currentUserService).requireBusinessUser(request);
+        verify(qaChatService).ask(7L, 2001L, "产品团队如何安排迭代？");
     }
 }

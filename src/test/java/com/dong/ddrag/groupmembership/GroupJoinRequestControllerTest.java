@@ -195,9 +195,8 @@ class GroupJoinRequestControllerTest {
 
     @Test
     void shouldRejectAdminWhenCreatingJoinRequest() throws Exception {
-        insertUser(9001L, "admin", "系统管理员", SystemRole.ADMIN);
         mockMvc.perform(post("/api/groups/join-requests")
-                        .header(HttpHeaders.AUTHORIZATION, bearerToken(9001L, "admin", SystemRole.ADMIN))
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(devAdminId(), "admin", SystemRole.ADMIN))
                         .contentType(APPLICATION_JSON)
                         .content(joinRequestJson(PRODUCT_TEAM_CODE)))
                 .andExpect(status().isForbidden())
@@ -252,6 +251,15 @@ class GroupJoinRequestControllerTest {
                 new JwtAccessTokenService.TokenSubject(userId, userCode, "用户-" + userCode, systemRole, false)
         );
     }
+
+    private long devAdminId() {
+        return jdbcTemplate.queryForObject(
+                "select id from users where user_code = ?",
+                Long.class,
+                "admin"
+        );
+    }
+
     private void insertInvitation(Long groupId, Long inviterUserId, Long inviteeUserId) {
         jdbcTemplate.update("""
                 insert into group_invitations (group_id, inviter_user_id, invitee_user_id, status, created_at, updated_at)

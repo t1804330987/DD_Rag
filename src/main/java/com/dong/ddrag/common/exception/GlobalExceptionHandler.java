@@ -2,6 +2,8 @@ package com.dong.ddrag.common.exception;
 
 import com.dong.ddrag.common.api.ApiResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -14,9 +16,16 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiResponse<Void> handleBusinessException(BusinessException exception) {
-        return new ApiResponse<>(false, null, exception.getMessage());
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException exception) {
+        HttpStatus status = switch (exception.getMessage()) {
+            case "GLOBAL_BUSY", "USER_BUSY", "CONNECTION_BUSY", "SESSION_BUSY" -> HttpStatus.TOO_MANY_REQUESTS;
+            default -> HttpStatus.BAD_REQUEST;
+        };
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(status);
+        if (status == HttpStatus.TOO_MANY_REQUESTS) {
+            response.header(HttpHeaders.RETRY_AFTER, "1");
+        }
+        return response.body(new ApiResponse<>(false, null, exception.getMessage()));
     }
 
     @ExceptionHandler(ForbiddenException.class)

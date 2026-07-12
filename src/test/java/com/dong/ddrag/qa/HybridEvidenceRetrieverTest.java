@@ -34,7 +34,7 @@ class HybridEvidenceRetrieverTest {
                 queryPlanningService,
                 1
         );
-        when(queryPlanningService.plan("上传流程")).thenReturn(new QueryPlanResult(
+        when(queryPlanningService.plan(null, "上传流程")).thenReturn(new QueryPlanResult(
                 QueryPlanStrategy.DIRECT,
                 List.of("上传流程")
         ));

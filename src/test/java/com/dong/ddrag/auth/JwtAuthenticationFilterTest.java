@@ -108,7 +108,7 @@ class JwtAuthenticationFilterTest {
                         .header("X-Test-User-Id", "u1001"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("access token 非法或已过期"));
+                .andExpect(jsonPath("$.message").value("登录凭证无效或已过期，请重新登录"));
     }
 
     @Test

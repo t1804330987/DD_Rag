@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dong.ddrag.modelplatform.mapper.ModelScenarioRouteMapper">
+    <resultMap id="map" type="com.dong.ddrag.modelplatform.model.entity.ModelScenarioRouteEntity"><id property="id" column="id"/><result property="scenario" column="scenario"/><result property="connectionId" column="connection_id"/><result property="modelId" column="model_id"/><result property="enabled" column="enabled"/><result property="createdAt" column="created_at"/><result property="updatedAt" column="updated_at"/></resultMap>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">insert into model_scenario_routes(scenario, connection_id, model_id, enabled, created_at, updated_at) values(#{scenario}, #{connectionId}, #{modelId}, #{enabled}, #{createdAt}, #{updatedAt})</insert>
+    <insert id="upsert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        insert into model_scenario_routes(scenario, connection_id, model_id, enabled, created_at, updated_at)
+        values(#{scenario}, #{connectionId}, #{modelId}, #{enabled}, #{createdAt}, #{updatedAt})
+        on conflict (scenario) do update set connection_id=excluded.connection_id, model_id=excluded.model_id,
+            enabled=excluded.enabled, updated_at=excluded.updated_at
+    </insert>
+    <select id="selectFormalRouteByScenario" resultMap="map">select r.* from model_scenario_routes r join model_connections c on c.id=r.connection_id join model_connection_models m on m.id=r.model_id and m.connection_id=r.connection_id where r.scenario=#{scenario} and r.enabled and c.owner_type='PLATFORM' and c.status='ACTIVE' and c.deleted_at is null and m.enabled and m.test_status='PASSED' and m.tested_config_version=c.config_version</select>
+</mapper>

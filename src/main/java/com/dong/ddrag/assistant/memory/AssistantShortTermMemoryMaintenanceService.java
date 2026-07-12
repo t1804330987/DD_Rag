@@ -53,7 +53,7 @@ public class AssistantShortTermMemoryMaintenanceService {
             Long groupId,
             Long currentMessageId
     ) {
-        maintain(sessionId, toolMode, groupId, currentMessageId);
+        maintain(userId, sessionId, toolMode, groupId, currentMessageId);
     }
 
     public void maintainAfterResponse(
@@ -63,7 +63,7 @@ public class AssistantShortTermMemoryMaintenanceService {
             Long groupId,
             Long currentMessageId
     ) {
-        maintain(sessionId, toolMode, groupId, currentMessageId);
+        maintain(userId, sessionId, toolMode, groupId, currentMessageId);
     }
 
     public boolean shouldMaintainSessionMemory(List<AssistantMessageEntity> newMessages, long lastRangeEndMessageId) {
@@ -91,7 +91,7 @@ public class AssistantShortTermMemoryMaintenanceService {
         return Math.max(1, totalChars / TOKEN_ESTIMATE_DIVISOR);
     }
 
-    private void maintain(Long sessionId, AssistantToolMode toolMode, Long groupId, Long currentMessageId) {
+    private void maintain(Long userId, Long sessionId, AssistantToolMode toolMode, Long groupId, Long currentMessageId) {
         List<AssistantMessageEntity> allMessages = assistantMessageMapper.selectBySessionIdOrderByCreatedAt(sessionId);
         AssistantSessionContextEntity existingContext = assistantSessionContextMapper.selectBySessionId(sessionId);
         long lastRangeEndMessageId = existingContext == null || existingContext.getSessionMemoryRangeEndMessageId() == null
@@ -108,6 +108,7 @@ public class AssistantShortTermMemoryMaintenanceService {
                 : existingContext;
         contextToWrite.setSessionId(sessionId);
         contextToWrite.setSessionMemory(assistantMemorySummarizer.summarizeSessionMemory(
+                userId, sessionId,
                 existingContext == null ? null : existingContext.getSessionMemory(),
                 newMessages,
                 toolMode,
@@ -125,6 +126,7 @@ public class AssistantShortTermMemoryMaintenanceService {
         int newTokenCount = estimateTokens(newMessages);
         if (shouldCompactSession(estimatedTokens, newMessages.size(), newTokenCount)) {
             contextToWrite.setCompactSummary(assistantMemorySummarizer.summarizeCompactSummary(
+                    userId, sessionId,
                     existingContext == null ? null : existingContext.getCompactSummary(),
                     contextToWrite.getSessionMemory(),
                     collectMessagesToCompact(allMessages, currentMessageId)

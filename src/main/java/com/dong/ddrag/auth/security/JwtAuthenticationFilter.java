@@ -15,12 +15,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     public static final String AUTHENTICATED_USER_REQUEST_ATTRIBUTE =
             JwtAuthenticationFilter.class.getName() + ".AUTHENTICATED_USER";
+    public static final String INVALID_ACCESS_TOKEN_MESSAGE = "登录凭证无效或已过期，请重新登录";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String LOGIN_PATH = "/api/auth/login";
     private static final String REGISTER_PATH = "/api/auth/register";
@@ -51,7 +53,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         String accessToken = authorization.substring(BEARER_PREFIX.length()).trim();
         if (accessToken.isEmpty()) {
-            writeUnauthorized(response, "access token 非法或已过期");
+            writeUnauthorized(response, INVALID_ACCESS_TOKEN_MESSAGE);
             return;
         }
         try {
@@ -83,7 +85,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private void writeUnauthorized(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType(new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.UTF_8).toString());
         objectMapper.writeValue(response.getWriter(), new ApiResponse<>(false, null, message));
     }
 

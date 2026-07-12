@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dong.ddrag.modelplatform.mapper.ModelConnectionGrantMapper">
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">insert into model_connection_grants(connection_id, grant_type, grantee_user_id, created_at) values(#{connectionId}, #{grantType}, #{granteeUserId}, #{createdAt})</insert>
+    <delete id="deleteByConnectionId">delete from model_connection_grants where connection_id=#{connectionId}</delete>
+    <select id="selectByConnectionId" resultType="com.dong.ddrag.modelplatform.model.entity.ModelConnectionGrantEntity">
+        select id, connection_id as connectionId, grant_type as grantType, grantee_user_id as granteeUserId, created_at as createdAt
+        from model_connection_grants where connection_id=#{connectionId} order by id
+    </select>
+    <select id="countActiveBusinessUsers" resultType="int">
+        select count(*) from users
+        where id in
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">#{userId}</foreach>
+        and system_role='USER' and status='ACTIVE'
+    </select>
+    <select id="existsActiveBusinessUser" resultType="boolean">
+        select exists(select 1 from users where id=#{userId} and system_role='USER' and status='ACTIVE')
+    </select>
+    <select id="existsGrantForUser" resultType="boolean">
+        select exists(
+            select 1 from model_connection_grants g
+            join model_connections c on c.id=g.connection_id
+            join users u on u.id=#{userId} and u.system_role='USER' and u.status='ACTIVE'
+            where g.connection_id=#{connectionId} and c.owner_type='PLATFORM'
+                and (g.grant_type='ALL_BUSINESS_USERS'
+                    or (g.grant_type='USER' and g.grantee_user_id=#{userId}))
+                and c.status='ACTIVE' and c.deleted_at is null)
+    </select>
+</mapper>

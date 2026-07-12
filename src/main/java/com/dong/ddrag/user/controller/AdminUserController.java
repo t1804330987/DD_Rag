@@ -2,6 +2,7 @@ package com.dong.ddrag.user.controller;
 
 import com.dong.ddrag.common.api.ApiResponse;
 import com.dong.ddrag.identity.service.CurrentUserService;
+import com.dong.ddrag.user.model.dto.CreateUserRequest;
 import com.dong.ddrag.user.model.dto.ResetUserPasswordRequest;
 import com.dong.ddrag.user.model.dto.UpdateUserStatusRequest;
 import com.dong.ddrag.user.model.vo.AdminUserItemResponse;
@@ -46,6 +47,15 @@ public class AdminUserController {
     ) {
         currentUserService.requireSystemAdmin(request);
         return ApiResponse.success(adminUserService.getUser(userId));
+    }
+
+    @PostMapping
+    public ApiResponse<AdminUserItemResponse> createUser(
+            @Valid @RequestBody CreateUserRequest request,
+            HttpServletRequest httpServletRequest
+    ) {
+        currentUserService.requireSystemAdmin(httpServletRequest);
+        return ApiResponse.success(adminUserService.createUser(request));
     }
 
     @PatchMapping("/{userId}/status")

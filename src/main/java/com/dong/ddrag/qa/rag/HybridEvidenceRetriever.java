@@ -66,10 +66,15 @@ public class HybridEvidenceRetriever implements EvidenceRetriever {
 
     @Override
     public RetrievedEvidenceBundle retrieve(Long groupId, String question, int topK) {
+        return retrieve(null, groupId, question, topK);
+    }
+
+    @Override
+    public RetrievedEvidenceBundle retrieve(Long userId, Long groupId, String question, int topK) {
         Long validGroupId = requirePositiveGroupId(groupId);
         String normalizedQuestion = requireQuestion(question);
         int validTopK = topK > 0 ? topK : EvidenceRetriever.DEFAULT_TOP_K;
-        QueryPlanResult queryPlan = queryPlanningService.plan(normalizedQuestion);
+        QueryPlanResult queryPlan = queryPlanningService.plan(userId, normalizedQuestion);
         Map<Long, RetrievalCandidate> candidates = new LinkedHashMap<>();
 
         for (String plannedQuery : queryPlan.queries()) {

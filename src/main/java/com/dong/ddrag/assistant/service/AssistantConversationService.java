@@ -19,6 +19,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.dong.ddrag.identity.service.CurrentUserService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,7 @@ import java.util.List;
 @Service
 public class AssistantConversationService {
 
+    private static final Logger log = LoggerFactory.getLogger(AssistantConversationService.class);
     private static final int MAX_RECENT_MESSAGE_LIMIT = 100;
 
     private final AssistantMessageMapper assistantMessageMapper;
@@ -270,23 +273,48 @@ public class AssistantConversationService {
         }
         if (role == AssistantMessageRole.USER) {
             // 用户消息入库后先做一次“响应前维护”，让下一次模型调用能读到最新的 session memory / compact summary。
-            assistantShortTermMemoryMaintenanceService.maintainBeforeResponse(
+            maintainShortTermMemorySafely(userId, dto, role, messageId);
+            return;
+        }
+        // 助手消息入库后再做一次“响应后维护”，让摘要状态和完整对话继续保持同步。
+        maintainShortTermMemorySafely(userId, dto, role, messageId);
+    }
+
+    private void maintainShortTermMemorySafely(
+            Long userId,
+            AssistantMessageCreateDTO dto,
+            AssistantMessageRole role,
+            Long messageId
+    ) {
+        try {
+            if (role == AssistantMessageRole.USER) {
+                assistantShortTermMemoryMaintenanceService.maintainBeforeResponse(
+                        userId,
+                        dto.sessionId(),
+                        dto.toolMode(),
+                        dto.groupId(),
+                        messageId
+                );
+                return;
+            }
+            assistantShortTermMemoryMaintenanceService.maintainAfterResponse(
                     userId,
                     dto.sessionId(),
                     dto.toolMode(),
                     dto.groupId(),
                     messageId
             );
-            return;
+        } catch (BusinessException exception) {
+            // 短期记忆是回答后的辅助收尾任务，失败不能污染已经成功保存的主回答。
+            log.warn(
+                    "Assistant short-term memory maintenance failed; message remains saved. userId={}, sessionId={}, messageId={}, role={}, error={}",
+                    userId,
+                    dto.sessionId(),
+                    messageId,
+                    role,
+                    exception.toString()
+            );
         }
-        // 助手消息入库后再做一次“响应后维护”，让摘要状态和完整对话继续保持同步。
-        assistantShortTermMemoryMaintenanceService.maintainAfterResponse(
-                userId,
-                dto.sessionId(),
-                dto.toolMode(),
-                dto.groupId(),
-                messageId
-        );
     }
 
     private AssistantMessageVO toMessageVO(AssistantMessageEntity entity) {

@@ -12,28 +12,39 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import com.dong.ddrag.modelplatform.model.enums.ModelScenario;
+import com.dong.ddrag.modelplatform.runtime.GovernedChatModel;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationContext;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationDispatcher;
+import com.dong.ddrag.modelplatform.runtime.ModelRuntimeService;
 
 @Service
 public class AssistantRuntimeMemoryPromptExtractor implements AssistantRuntimeMemoryExtractor {
 
     private static final int MAX_CHANGES = 3;
 
-    private final ChatClient chatClient;
     private final PromptTemplate promptTemplate;
     private final ObjectMapper objectMapper;
+    private final ModelRuntimeService modelRuntimeService;
+    private final ModelInvocationDispatcher invocationDispatcher;
 
     public AssistantRuntimeMemoryPromptExtractor(
-            ChatClient.Builder chatClientBuilder,
             @Qualifier("assistantRuntimeMemoryExtractionPromptTemplate") PromptTemplate promptTemplate,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            ModelRuntimeService modelRuntimeService,
+            ModelInvocationDispatcher invocationDispatcher
     ) {
-        this.chatClient = chatClientBuilder.build();
         this.promptTemplate = promptTemplate;
         this.objectMapper = objectMapper;
+        this.modelRuntimeService = modelRuntimeService;
+        this.invocationDispatcher = invocationDispatcher;
     }
 
     @Override
     public List<AssistantRuntimeMemoryChange> extract(
+            Long userId,
+            Long sessionId,
             AssistantRuntimeMemoryState state,
             List<AssistantMessageVO> recentMessages,
             String currentUserMessage
@@ -43,13 +54,27 @@ public class AssistantRuntimeMemoryPromptExtractor implements AssistantRuntimeMe
                 "recentMessages", formatRecentMessages(recentMessages),
                 "currentUserMessage", currentUserMessage == null ? "" : currentUserMessage
         ));
-        String content = chatClient.prompt(prompt).call().content();
+        String content = chatClient(userId, sessionId).prompt(prompt).call().content();
         ExtractorResponse response = parseResponse(content);
         List<AssistantRuntimeMemoryChange> changes = response.changes() == null
                 ? List.of()
                 : response.changes().stream().limit(MAX_CHANGES).toList();
         validateChanges(state == null ? AssistantRuntimeMemoryState.empty() : state, changes);
         return changes;
+    }
+
+    @Override
+    public List<AssistantRuntimeMemoryChange> extract(AssistantRuntimeMemoryState state,
+                                                       List<AssistantMessageVO> recentMessages,
+                                                       String currentUserMessage) {
+        throw new IllegalStateException("运行时记忆提取必须提供用户和会话上下文");
+    }
+
+    private ChatClient chatClient(Long userId, Long sessionId) {
+        ModelInvocationContext context = modelRuntimeService.resolveScenario(userId,
+                ModelScenario.RUNTIME_MEMORY_EXTRACTION,
+                new ModelRuntimeService.InvocationCorrelation(UUID.randomUUID().toString(), null, null, null, sessionId));
+        return ChatClient.builder(new GovernedChatModel(context, invocationDispatcher)).build();
     }
 
     private ExtractorResponse parseResponse(String content) {

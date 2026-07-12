@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dong.ddrag.modelplatform.mapper.ModelConnectionModelMapper">
+    <resultMap id="map" type="com.dong.ddrag.modelplatform.model.entity.ModelConnectionModelEntity">
+        <id property="id" column="id"/><result property="connectionId" column="connection_id"/><result property="modelName" column="model_name"/>
+        <result property="sourceType" column="source_type"/><result property="capabilitiesJson" column="capabilities_json"/><result property="testStatus" column="test_status"/>
+        <result property="testedConfigVersion" column="tested_config_version"/><result property="lastTestAt" column="last_test_at"/><result property="enabled" column="enabled"/><result property="hiddenAt" column="hidden_at"/>
+        <result property="createdAt" column="created_at"/><result property="updatedAt" column="updated_at"/>
+    </resultMap>
+    <sql id="columns">m.id, m.connection_id, m.model_name, m.source_type, m.capabilities_json::text as capabilities_json, m.test_status, m.tested_config_version, m.last_test_at, m.enabled, m.hidden_at, m.created_at, m.updated_at</sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        insert into model_connection_models(connection_id, model_name, source_type, capabilities_json, test_status, tested_config_version, last_test_at, enabled, created_at, updated_at)
+        values(#{connectionId}, #{modelName}, #{sourceType}, cast(#{capabilitiesJson} as jsonb), #{testStatus}, #{testedConfigVersion}, #{lastTestAt}, #{enabled}, #{createdAt}, #{updatedAt})
+    </insert>
+    <select id="selectById" resultMap="map">select <include refid="columns"/> from model_connection_models m where m.id=#{modelId} and m.connection_id=#{connectionId} and m.hidden_at is null</select>
+    <select id="selectByConnectionId" resultMap="map">select <include refid="columns"/> from model_connection_models m where m.connection_id=#{connectionId} and m.hidden_at is null order by m.model_name</select>
+    <select id="selectFormalById" resultMap="map">select <include refid="columns"/> from model_connection_models m join model_connections c on c.id=m.connection_id where m.id=#{modelId} and m.connection_id=#{connectionId} and m.hidden_at is null and m.enabled and m.test_status='PASSED' and m.tested_config_version=c.config_version and c.status='ACTIVE' and c.deleted_at is null</select>
+    <select id="selectFormalByConnectionId" resultMap="map">select <include refid="columns"/> from model_connection_models m join model_connections c on c.id=m.connection_id where m.connection_id=#{connectionId} and m.hidden_at is null and m.enabled and m.test_status='PASSED' and m.tested_config_version=c.config_version and c.status='ACTIVE' and c.deleted_at is null order by m.model_name</select>
+    <insert id="upsertCatalogModel">
+        insert into model_connection_models(connection_id, model_name, source_type, capabilities_json, test_status,
+            tested_config_version, last_test_at, enabled, created_at, updated_at)
+        values(#{connectionId}, #{modelName}, #{sourceType}, cast(#{capabilitiesJson} as jsonb), #{testStatus},
+            #{testedConfigVersion}, #{lastTestAt}, #{enabled}, #{createdAt}, #{updatedAt})
+        on conflict (connection_id, model_name) do update set
+            source_type=case
+                when model_connection_models.source_type='MANUAL' then 'MANUAL'
+                when excluded.source_type='DISCOVERED' then 'DISCOVERED'
+                else model_connection_models.source_type end,
+            capabilities_json=coalesce(excluded.capabilities_json, model_connection_models.capabilities_json),
+            test_status=case when model_connection_models.hidden_at is not null and excluded.source_type in ('DISCOVERED', 'MANUAL') then 'UNVERIFIED' else model_connection_models.test_status end,
+            tested_config_version=case when model_connection_models.hidden_at is not null and excluded.source_type in ('DISCOVERED', 'MANUAL') then null else model_connection_models.tested_config_version end,
+            last_test_at=case when model_connection_models.hidden_at is not null and excluded.source_type in ('DISCOVERED', 'MANUAL') then null else model_connection_models.last_test_at end,
+            enabled=case when model_connection_models.hidden_at is not null and excluded.source_type in ('DISCOVERED', 'MANUAL') then false else model_connection_models.enabled end,
+            hidden_at=case when model_connection_models.hidden_at is not null and excluded.source_type in ('DISCOVERED', 'MANUAL') then null else model_connection_models.hidden_at end,
+            updated_at=excluded.updated_at
+    </insert>
+    <update id="invalidateTests">
+        update model_connection_models set test_status='UNVERIFIED', tested_config_version=null, last_test_at=null,
+            enabled=false, updated_at=#{updatedAt} where connection_id=#{connectionId}
+    </update>
+    <update id="completeTestCas">
+        update model_connection_models m set test_status=#{testStatus}, tested_config_version=#{configVersion},
+            last_test_at=#{testedAt}, enabled=case when #{testStatus}='PASSED' then m.enabled else false end, updated_at=#{testedAt}
+        from model_connections c where m.id=#{modelId} and m.connection_id=#{connectionId}
+            and c.id=m.connection_id and c.config_version=#{configVersion} and c.status not in ('DISABLED','DELETED') and m.hidden_at is null
+    </update>
+    <update id="updateEnabled">
+        update model_connection_models m set enabled=#{enabled}, updated_at=#{updatedAt}
+        from model_connections c
+        where m.id=#{modelId} and m.connection_id=#{connectionId}
+            and c.id=m.connection_id and c.config_version=#{configVersion}
+            and c.status not in ('DISABLED','DELETED') and c.deleted_at is null and m.hidden_at is null
+            and (not #{enabled} or (m.test_status='PASSED' and m.tested_config_version=#{configVersion}))
+    </update>
+    <update id="hideById">
+        update model_connection_models set hidden_at=#{hiddenAt}, enabled=false, updated_at=#{hiddenAt}
+        where id=#{modelId} and connection_id=#{connectionId} and hidden_at is null
+    </update>
+</mapper>

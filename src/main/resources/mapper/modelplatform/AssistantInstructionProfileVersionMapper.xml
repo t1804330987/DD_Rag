@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dong.ddrag.modelplatform.mapper.AssistantInstructionProfileVersionMapper">
+    <resultMap id="map" type="com.dong.ddrag.modelplatform.model.entity.AssistantInstructionProfileVersionEntity"><id property="id" column="id"/><result property="profileId" column="profile_id"/><result property="version" column="version"/><result property="content" column="content"/><result property="createdAt" column="created_at"/></resultMap>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">insert into assistant_instruction_profile_versions(profile_id, version, content, created_at) values(#{profileId}, #{version}, #{content}, #{createdAt})</insert>
+    <select id="selectByProfileIdAndUserId" resultMap="map">
+        select v.*
+        from assistant_instruction_profile_versions v
+        join assistant_instruction_profiles p on p.id=v.profile_id
+        where v.profile_id=#{profileId} and p.user_id=#{userId}
+        order by v.version desc
+    </select>
+    <select id="selectCurrentByProfileIdAndUserId" resultMap="map">
+        select v.*
+        from assistant_instruction_profile_versions v
+        join assistant_instruction_profiles p on p.id=v.profile_id and p.current_version_id=v.id
+        where p.id=#{profileId} and p.user_id=#{userId} and p.enabled
+    </select>
+    <select id="selectMaxVersionByProfileId" resultType="java.lang.Integer">
+        select coalesce(max(version), 0) from assistant_instruction_profile_versions where profile_id=#{profileId}
+    </select>
+</mapper>

@@ -1,6 +1,20 @@
 package com.dong.ddrag.qa;
 
-import com.dong.ddrag.qa.model.KnowledgeAnswerOutput;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import com.dong.ddrag.modelplatform.model.enums.ConnectionOwnerType;
+import com.dong.ddrag.modelplatform.model.enums.ModelScenario;
+import com.dong.ddrag.modelplatform.model.enums.ProviderType;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationContext;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationDispatcher;
+import com.dong.ddrag.modelplatform.runtime.ModelRuntimeService;
 import com.dong.ddrag.qa.model.EvidenceLevel;
 import com.dong.ddrag.qa.model.vo.AskQuestionResponse;
 import com.dong.ddrag.qa.rag.EvidenceRetriever;
@@ -9,283 +23,129 @@ import com.dong.ddrag.qa.service.QaChatService;
 import com.dong.ddrag.qa.support.CitationAssembler;
 import com.dong.ddrag.qa.support.QaAnswerParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.mockito.Answers;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.ChatClient.CallResponseSpec;
-import org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
-
-import java.util.List;
-import java.util.Map;
-import java.lang.reflect.Method;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
 
 class QaChatServiceTest {
 
     @Test
-    void shouldReturnUnansweredWithoutContext() {
-        ChatClient chatClient = mock(ChatClient.class, Answers.RETURNS_DEEP_STUBS);
+    void shouldReturnUnansweredWithoutEvidenceWithoutResolvingModel() {
         EvidenceRetriever retriever = mock(EvidenceRetriever.class);
-        when(retriever.retrieve(2001L, "上传流程")).thenReturn(RetrievedEvidenceBundle.empty());
-        QaChatService qaChatService = new QaChatService(
-                chatClient,
-                promptTemplate("问题：\n{question}\n证据等级：\n{evidenceLevel}\n回答策略：\n{evidenceGuidance}"),
-                retriever,
-                new QaAnswerParser(new ObjectMapper()),
-                new CitationAssembler()
-        );
+        ModelRuntimeService runtimeService = mock(ModelRuntimeService.class);
+        ModelInvocationDispatcher dispatcher = mock(ModelInvocationDispatcher.class);
+        when(retriever.retrieve(7L, 2001L, "上传流程")).thenReturn(RetrievedEvidenceBundle.empty());
 
-        AskQuestionResponse response = qaChatService.ask(2001L, "上传流程");
+        AskQuestionResponse response = service(retriever, runtimeService, dispatcher)
+                .ask(7L, 2001L, "上传流程");
 
         assertThat(response.answered()).isFalse();
         assertThat(response.reasonCode()).isEqualTo("INSUFFICIENT_EVIDENCE");
-        verifyNoInteractions(chatClient);
+        verifyNoInteractions(runtimeService, dispatcher);
     }
 
     @Test
-    void shouldReturnAnsweredResponseWhenChatClientReturnsValidJson() {
-        ChatClient chatClient = mock(ChatClient.class, Answers.RETURNS_DEEP_STUBS);
+    void shouldUseQaAnswerScenarioAndReturnGroundedCitations() {
         EvidenceRetriever retriever = mock(EvidenceRetriever.class);
-        when(retriever.retrieve(2001L, "上传流程")).thenReturn(bundle(
-                EvidenceLevel.SUFFICIENT,
-                "当前证据较充分，可以正常回答，但仍然不得超出证据进行臆测。",
-                List.of(
-                        Document.builder()
-                                .id("E1")
-                                .text("产品团队每两周发布一次。")
-                                .metadata(Map.of(
-                                        "evidenceId", "E1",
-                                        "documentId", 1001L,
-                                        "chunkId", 9001L,
-                                        "chunkIndex", 0,
-                                        "fileName", "产品手册.md",
-                                        "score", 0.91D
-                                ))
-                                .build()
-                )
-        ));
-        when(chatClient.prompt(any(Prompt.class))
-                .advisors(any(java.util.function.Consumer.class))
-                .call()
-                .entity(KnowledgeAnswerOutput.class)).thenReturn(
-                        new KnowledgeAnswerOutput(
-                                true,
-                                "产品团队每两周发布一次。",
-                                null,
-                                null
-                        )
-                );
-        QaChatService qaChatService = new QaChatService(
-                chatClient,
-                promptTemplate("问题：\n{question}\n证据等级：\n{evidenceLevel}\n回答策略：\n{evidenceGuidance}"),
-                retriever,
-                new QaAnswerParser(new ObjectMapper()),
-                new CitationAssembler()
-        );
+        ModelRuntimeService runtimeService = mock(ModelRuntimeService.class);
+        ModelInvocationDispatcher dispatcher = mock(ModelInvocationDispatcher.class);
+        ModelInvocationContext context = context(7L, ModelScenario.QA_ANSWER);
+        when(retriever.retrieve(7L, 2001L, "上传流程")).thenReturn(bundle());
+        when(runtimeService.resolveScenario(eq(7L), eq(ModelScenario.QA_ANSWER), any()))
+                .thenReturn(context);
+        when(dispatcher.call(eq(context), any(Prompt.class))).thenReturn(response("""
+                {"answered":true,"answer":"产品团队每两周发布一次。"}
+                """));
 
-        AskQuestionResponse response = qaChatService.ask(2001L, "上传流程");
+        AskQuestionResponse answer = service(retriever, runtimeService, dispatcher)
+                .ask(7L, 2001L, "上传流程");
 
-        assertThat(response.answered()).isTrue();
-        assertThat(response.answer()).isEqualTo("产品团队每两周发布一次。");
-        assertThat(response.citations()).hasSize(1);
-        assertThat(response.citations().getFirst().fileName()).isEqualTo("产品手册.md");
+        assertThat(answer.answered()).isTrue();
+        assertThat(answer.answer()).isEqualTo("产品团队每两周发布一次。");
+        assertThat(answer.citations()).hasSize(1);
+        verify(runtimeService).resolveScenario(eq(7L), eq(ModelScenario.QA_ANSWER), any());
+        verify(dispatcher).call(eq(context), any(Prompt.class));
     }
 
     @Test
-    void shouldFallbackToRawContentWhenStructuredOutputFails() {
-        ChatClient chatClient = mock(ChatClient.class);
-        ChatClientRequestSpec requestSpec = mock(ChatClientRequestSpec.class);
-        CallResponseSpec callResponseSpec = mock(CallResponseSpec.class);
+    void shouldFallbackToRawAnswerThroughASecondGovernedInvocation() {
         EvidenceRetriever retriever = mock(EvidenceRetriever.class);
-        when(retriever.retrieve(2001L, "上传流程")).thenReturn(bundle(
-                EvidenceLevel.PARTIAL,
-                "当前证据只覆盖部分问题，只能回答证据明确支持的部分，未覆盖部分必须明确说明不足。",
-                List.of(
-                        Document.builder()
-                                .id("E1")
-                                .text("产品团队每两周发布一次。")
-                                .metadata(Map.of(
-                                        "evidenceId", "E1",
-                                        "documentId", 1001L,
-                                        "chunkId", 9001L,
-                                        "chunkIndex", 0,
-                                        "fileName", "产品手册.md",
-                                        "score", 0.91D
-                                ))
-                                .build()
-                )
-        ));
-        when(chatClient.prompt(any(Prompt.class))).thenReturn(requestSpec);
-        when(requestSpec.advisors(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(callResponseSpec);
-        when(callResponseSpec.entity(KnowledgeAnswerOutput.class))
-                .thenThrow(new IllegalStateException("structured output failed"));
-        when(callResponseSpec.content()).thenReturn("""
-                {
-                  "answered": true,
-                  "answer": "产品团队每两周发布一次。"
-                }
-                """);
-        QaChatService qaChatService = new QaChatService(
-                chatClient,
-                promptTemplate("问题：\n{question}\n证据等级：\n{evidenceLevel}\n回答策略：\n{evidenceGuidance}"),
-                retriever,
-                new QaAnswerParser(new ObjectMapper()),
-                new CitationAssembler()
-        );
+        ModelRuntimeService runtimeService = mock(ModelRuntimeService.class);
+        ModelInvocationDispatcher dispatcher = mock(ModelInvocationDispatcher.class);
+        ModelInvocationContext first = context(7L, ModelScenario.QA_ANSWER);
+        ModelInvocationContext second = context(7L, ModelScenario.QA_ANSWER);
+        when(retriever.retrieve(7L, 2001L, "上传流程")).thenReturn(bundle());
+        when(runtimeService.resolveScenario(eq(7L), eq(ModelScenario.QA_ANSWER), any()))
+                .thenReturn(first, second);
+        when(dispatcher.call(eq(first), any(Prompt.class))).thenReturn(response("not-json"));
+        when(dispatcher.call(eq(second), any(Prompt.class))).thenReturn(response("""
+                {"answered":true,"answer":"产品团队每两周发布一次。"}
+                """));
 
-        AskQuestionResponse response = qaChatService.ask(2001L, "上传流程");
+        AskQuestionResponse answer = service(retriever, runtimeService, dispatcher)
+                .ask(7L, 2001L, "上传流程");
 
-        assertThat(response.answered()).isTrue();
-        assertThat(response.answer()).isEqualTo("产品团队每两周发布一次。");
-        assertThat(response.citations()).hasSize(1);
-        assertThat(response.citations().getFirst().fileName()).isEqualTo("产品手册.md");
+        assertThat(answer.answered()).isTrue();
+        assertThat(answer.answer()).isEqualTo("产品团队每两周发布一次。");
+        verify(dispatcher).call(eq(first), any(Prompt.class));
+        verify(dispatcher).call(eq(second), any(Prompt.class));
     }
 
     @Test
-    void shouldDeduplicateCitationsByFileName() {
-        ChatClient chatClient = mock(ChatClient.class, Answers.RETURNS_DEEP_STUBS);
-        EvidenceRetriever retriever = mock(EvidenceRetriever.class);
-        when(retriever.retrieve(2001L, "上传流程")).thenReturn(bundle(
-                EvidenceLevel.SUFFICIENT,
-                "当前证据较充分，可以正常回答，但仍然不得超出证据进行臆测。",
-                List.of(
-                        Document.builder()
-                                .id("E1")
-                                .text("产品团队每两周发布一次。")
-                                .metadata(Map.of(
-                                        "evidenceId", "E1",
-                                        "documentId", 1001L,
-                                        "chunkId", 9001L,
-                                        "chunkIndex", 0,
-                                        "fileName", "产品手册.md",
-                                        "score", 0.91D
-                                ))
-                                .build(),
-                        Document.builder()
-                                .id("E2")
-                                .text("产品团队每个迭代结束后复盘。")
-                                .metadata(Map.of(
-                                        "evidenceId", "E2",
-                                        "documentId", 1001L,
-                                        "chunkId", 9002L,
-                                        "chunkIndex", 1,
-                                        "fileName", "产品手册.md",
-                                        "score", 0.88D
-                                ))
-                                .build()
-                )
-        ));
-        when(chatClient.prompt(any(Prompt.class))
-                .advisors(any(java.util.function.Consumer.class))
-                .call()
-                .entity(KnowledgeAnswerOutput.class)).thenReturn(
-                        new KnowledgeAnswerOutput(
-                                true,
-                                "产品团队每两周发布一次。",
-                                null,
-                                null
-                        )
-                );
-        QaChatService qaChatService = new QaChatService(
-                chatClient,
-                promptTemplate("问题：\n{question}\n证据等级：\n{evidenceLevel}\n回答策略：\n{evidenceGuidance}"),
+    void shouldRejectLegacyCallWithoutActualUserContext() {
+        QaChatService service = service(mock(EvidenceRetriever.class), mock(ModelRuntimeService.class),
+                mock(ModelInvocationDispatcher.class));
+
+        assertThatThrownBy(() -> service.ask(2001L, "上传流程"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("实际用户上下文");
+    }
+
+    private QaChatService service(EvidenceRetriever retriever, ModelRuntimeService runtimeService,
+                                  ModelInvocationDispatcher dispatcher) {
+        return new QaChatService(
+                promptTemplate("系统规则"),
+                retrievalAdvisor(),
+                promptTemplate("问题：{question}\n证据等级：{evidenceLevel}\n回答策略：{evidenceGuidance}"),
                 retriever,
                 new QaAnswerParser(new ObjectMapper()),
-                new CitationAssembler()
+                new CitationAssembler(),
+                runtimeService,
+                dispatcher
         );
-
-        AskQuestionResponse response = qaChatService.ask(2001L, "上传流程");
-
-        assertThat(response.answered()).isTrue();
-        assertThat(response.citations()).hasSize(1);
-        assertThat(response.citations().getFirst().fileName()).isEqualTo("产品手册.md");
     }
 
-    @Test
-    void shouldRenderUserPromptWithEvidenceLevelConstraints() {
-        EvidenceRetriever retriever = mock(EvidenceRetriever.class);
-        QaChatService qaChatService = new QaChatService(
-                mock(ChatClient.class),
-                promptTemplate("""
-                        问题：
-                        {question}
-
-                        证据等级：
-                        {evidenceLevel}
-
-                        回答策略：
-                        {evidenceGuidance}
-                        """),
-                retriever,
-                new QaAnswerParser(new ObjectMapper()),
-                new CitationAssembler()
-        );
-        RetrievedEvidenceBundle evidenceBundle = bundle(
-                EvidenceLevel.WEAK,
-                "当前证据相关性有限，只能谨慎回答，必须明确说明依据有限，不能给出确定性结论。",
-                List.of(
-                        Document.builder()
-                                .id("E1")
-                                .text("产品团队每两周发布一次。")
-                                .metadata(Map.of(
-                                        "evidenceId", "E1",
-                                        "documentId", 1001L,
-                                        "chunkId", 9001L,
-                                        "chunkIndex", 0,
-                                        "fileName", "产品手册.md",
-                                        "score", 0.91D
-                                ))
-                                .build()
-                )
-        );
-
-        Prompt renderedPrompt = invokeCreateUserPrompt(qaChatService, "上传流程", evidenceBundle);
-
-        String renderedText = renderedPrompt.getInstructions().stream()
-                .map(message -> message.getText())
-                .reduce("", String::concat);
-        assertThat(renderedText).contains("WEAK");
-        assertThat(renderedText).contains("只能谨慎回答");
+    private RetrievedEvidenceBundle bundle() {
+        return new RetrievedEvidenceBundle(List.of(Document.builder().id("E1").text("产品团队每两周发布一次。")
+                .metadata(Map.of("evidenceId", "E1", "documentId", 1001L, "chunkId", 9001L,
+                        "chunkIndex", 0, "fileName", "产品手册.md", "score", 0.91D)).build()),
+                EvidenceLevel.SUFFICIENT, "仅基于证据回答。");
     }
 
-    private RetrievedEvidenceBundle bundle(
-            EvidenceLevel evidenceLevel,
-            String evidenceGuidance,
-            List<Document> documents
-    ) {
-        return new RetrievedEvidenceBundle(documents, evidenceLevel, evidenceGuidance);
+    private ModelInvocationContext context(Long userId, ModelScenario scenario) {
+        return new ModelInvocationContext(userId, scenario, 11L, 21L, 1L, ProviderType.DASHSCOPE,
+                "qwen-plus", "qa-route", ConnectionOwnerType.PLATFORM, null, null, null, null, null);
     }
 
-    private Prompt invokeCreateUserPrompt(
-            QaChatService qaChatService,
-            String question,
-            RetrievedEvidenceBundle evidenceBundle
-    ) {
-        try {
-            Method method = QaChatService.class.getDeclaredMethod(
-                    "createUserPrompt",
-                    String.class,
-                    RetrievedEvidenceBundle.class
-            );
-            method.setAccessible(true);
-            return (Prompt) method.invoke(qaChatService, question, evidenceBundle);
-        } catch (ReflectiveOperationException exception) {
-            throw new AssertionError("无法调用 createUserPrompt", exception);
-        }
+    private ChatResponse response(String content) {
+        return new ChatResponse(List.of(new Generation(new AssistantMessage(content))));
     }
 
     private PromptTemplate promptTemplate(String template) {
-        return PromptTemplate.builder()
-                .template(template)
-                .build();
+        return PromptTemplate.builder().template(template).build();
+    }
+
+    private RetrievalAugmentationAdvisor retrievalAdvisor() {
+        DocumentRetriever retriever = mock(DocumentRetriever.class);
+        when(retriever.retrieve(any())).thenReturn(List.of());
+        return RetrievalAugmentationAdvisor.builder().documentRetriever(retriever).build();
     }
 }

@@ -2,6 +2,9 @@ package com.dong.ddrag.assistant.controller;
 
 import com.dong.ddrag.assistant.model.dto.session.CreateAssistantSessionRequest;
 import com.dong.ddrag.assistant.model.dto.session.UpdateAssistantSessionRequest;
+import com.dong.ddrag.assistant.model.dto.session.SelectAssistantInstructionRequest;
+import com.dong.ddrag.assistant.model.dto.session.SelectAssistantModelRequest;
+import com.dong.ddrag.assistant.service.AssistantModelSelectionService;
 import com.dong.ddrag.assistant.model.vo.session.AssistantSessionDetailVO;
 import com.dong.ddrag.assistant.model.vo.session.AssistantSessionListItemVO;
 import com.dong.ddrag.assistant.service.AssistantSessionService;
@@ -24,9 +27,12 @@ import java.util.List;
 public class AssistantSessionController {
 
     private final AssistantSessionService assistantSessionService;
+    private final AssistantModelSelectionService modelSelectionService;
 
-    public AssistantSessionController(AssistantSessionService assistantSessionService) {
+    public AssistantSessionController(AssistantSessionService assistantSessionService,
+                                      AssistantModelSelectionService modelSelectionService) {
         this.assistantSessionService = assistantSessionService;
+        this.modelSelectionService = modelSelectionService;
     }
 
     @PostMapping
@@ -40,6 +46,13 @@ public class AssistantSessionController {
     @GetMapping
     public List<AssistantSessionListItemVO> listSessions(HttpServletRequest request) {
         return assistantSessionService.listSessions(request);
+    }
+
+    @GetMapping("/models")
+    public ApiResponse<List<AssistantModelSelectionService.AvailableModelView>> listAvailableModels(
+            HttpServletRequest request
+    ) {
+        return ApiResponse.success(modelSelectionService.listAvailableModels(request));
     }
 
     @GetMapping("/{sessionId}")
@@ -57,6 +70,22 @@ public class AssistantSessionController {
             HttpServletRequest request
     ) {
         return ApiResponse.success(assistantSessionService.renameSession(request, sessionId, requestBody));
+    }
+
+    @PatchMapping("/{sessionId}/model")
+    public ApiResponse<Void> selectModel(@PathVariable Long sessionId,
+                                         @Valid @RequestBody SelectAssistantModelRequest requestBody,
+                                         HttpServletRequest request) {
+        assistantSessionService.selectModel(request, sessionId, requestBody.connectionId(), requestBody.modelId());
+        return ApiResponse.success(null);
+    }
+
+    @PatchMapping("/{sessionId}/instruction-profile")
+    public ApiResponse<Void> selectInstructionProfile(@PathVariable Long sessionId,
+                                                      @Valid @RequestBody SelectAssistantInstructionRequest requestBody,
+                                                      HttpServletRequest request) {
+        assistantSessionService.selectInstructionProfile(request, sessionId, requestBody.instructionProfileId());
+        return ApiResponse.success(null);
     }
 
     @DeleteMapping("/{sessionId}")

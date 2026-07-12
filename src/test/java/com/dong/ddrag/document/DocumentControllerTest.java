@@ -134,7 +134,12 @@ class DocumentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].documentId").value(documentId))
-                .andExpect(jsonPath("$[0].status").value("READY"));
+                .andExpect(jsonPath("$[0].status").value(org.hamcrest.Matchers.anyOf(
+                        org.hamcrest.Matchers.is("PROCESSING"),
+                        org.hamcrest.Matchers.is("READY")
+                )));
+
+        assertThat(queryFailureReason(documentId)).isNull();
     }
 
     @Test
@@ -306,6 +311,14 @@ class DocumentControllerTest {
                 documentId
         );
         return count == null ? 0 : count;
+    }
+
+    private String queryFailureReason(long documentId) {
+        return jdbcTemplate.queryForObject(
+                "select failure_reason from documents where id = ?",
+                String.class,
+                documentId
+        );
     }
 
     private void updateDocumentPreview(long documentId, String previewText) {

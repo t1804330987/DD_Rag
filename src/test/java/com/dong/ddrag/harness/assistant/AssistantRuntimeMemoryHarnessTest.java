@@ -57,7 +57,7 @@ class AssistantRuntimeMemoryHarnessTest {
         HarnessRuntime runtime = createRuntime();
         given(runtime.contextMapper.selectBySessionId(SESSION_ID))
                 .willReturn(contextWithState(1L, stateWithConclusion("方案 A")));
-        given(runtime.extractor.extract(any(), any(), eq("把论文选题改成方案 B")))
+        given(runtime.extractor.extract(any(), any(), any(), any(), eq("把论文选题改成方案 B")))
                 .willReturn(List.of(new AssistantRuntimeMemoryChange(
                         AssistantRuntimeMemoryAction.REPLACE,
                         "rm_1",
@@ -93,7 +93,7 @@ class AssistantRuntimeMemoryHarnessTest {
         givenSavedUserAndAssistantMessages(conversationService, "B 好像也可以，按这个写一版", "你是想把论文选题从方案 A 改成方案 B 吗？");
         given(runtime.contextMapper.selectBySessionId(SESSION_ID))
                 .willReturn(contextWithState(1L, stateWithConclusion("方案 A")));
-        given(runtime.extractor.extract(any(), any(), eq("B 好像也可以，按这个写一版")))
+        given(runtime.extractor.extract(any(), any(), any(), any(), eq("B 好像也可以，按这个写一版")))
                 .willReturn(List.of(new AssistantRuntimeMemoryChange(
                         AssistantRuntimeMemoryAction.ASK_CONFIRMATION,
                         "rm_1",

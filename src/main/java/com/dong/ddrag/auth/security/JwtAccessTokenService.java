@@ -71,15 +71,15 @@ public class JwtAccessTokenService {
         } catch (BusinessException exception) {
             throw exception;
         } catch (JwtException | IllegalArgumentException exception) {
-            throw new BusinessException("access token 非法或已过期", exception);
+            throw new BusinessException(JwtAuthenticationFilter.INVALID_ACCESS_TOKEN_MESSAGE, exception);
         } catch (RuntimeException exception) {
-            throw new BusinessException("access token 非法或已过期", exception);
+            throw new BusinessException(JwtAuthenticationFilter.INVALID_ACCESS_TOKEN_MESSAGE, exception);
         }
     }
 
     private void validateClaims(Claims claims) {
         if (!authProperties.getIssuer().equals(claims.getIssuer())) {
-            throw new BusinessException("access token 非法或已过期");
+            throw new BusinessException(JwtAuthenticationFilter.INVALID_ACCESS_TOKEN_MESSAGE);
         }
         if (claims.getSubject() == null
                 || claims.get(USER_ID_CLAIM, Long.class) == null
@@ -88,7 +88,7 @@ public class JwtAccessTokenService {
                 || claims.get(MUST_CHANGE_PASSWORD_CLAIM, Boolean.class) == null
                 || claims.getIssuedAt() == null
                 || claims.getExpiration() == null) {
-            throw new BusinessException("access token 非法或已过期");
+            throw new BusinessException(JwtAuthenticationFilter.INVALID_ACCESS_TOKEN_MESSAGE);
         }
     }
 

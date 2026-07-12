@@ -121,10 +121,8 @@ class GroupManagementControllerTest {
 
     @Test
     void shouldRejectAdminWhenCreatingBusinessGroup() throws Exception {
-        insertUser(9001L, "admin", "系统管理员", SystemRole.ADMIN);
-
         mockMvc.perform(post("/api/groups")
-                        .header(HttpHeaders.AUTHORIZATION, bearerToken(9001L, "admin", SystemRole.ADMIN))
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(devAdminId(), "admin", SystemRole.ADMIN))
                         .contentType(APPLICATION_JSON)
                         .content("""
                                 {"name":"管理员业务组","description":"admin should not enter business area"}
@@ -280,6 +278,14 @@ class GroupManagementControllerTest {
                         systemRole,
                         false
                 )
+        );
+    }
+
+    private long devAdminId() {
+        return jdbcTemplate.queryForObject(
+                "select id from users where user_code = ?",
+                Long.class,
+                "admin"
         );
     }
 

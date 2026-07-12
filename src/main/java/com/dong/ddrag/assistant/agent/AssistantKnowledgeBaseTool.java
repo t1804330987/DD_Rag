@@ -21,6 +21,7 @@ public class AssistantKnowledgeBaseTool {
 
     public static final String TOOL_NAME = "knowledgeBaseSearch";
     public static final String GROUP_ID_CONTEXT_KEY = "groupId";
+    public static final String USER_ID_CONTEXT_KEY = "userId";
     public static final String RESULT_HOLDER_CONTEXT_KEY = "knowledgeBaseToolResultHolder";
 
     private static final String INSUFFICIENT_CODE = "INSUFFICIENT_EVIDENCE";
@@ -46,6 +47,7 @@ public class AssistantKnowledgeBaseTool {
             ToolContext toolContext
     ) {
         Long groupId = readGroupId(toolContext);
+        Long userId = readUserId(toolContext);
         AssistantKnowledgeBaseToolResultHolder resultHolder = readResultHolder(toolContext);
         if (resultHolder.hasCompletedSearch()) {
             return new KnowledgeBaseSearchToolResponse(
@@ -59,7 +61,7 @@ public class AssistantKnowledgeBaseTool {
             );
         }
         String safeQuery = requireQuery(query);
-        RetrievedEvidenceBundle evidenceBundle = evidenceRetriever.retrieve(groupId, safeQuery);
+        RetrievedEvidenceBundle evidenceBundle = evidenceRetriever.retrieve(userId, groupId, safeQuery);
         List<Document> documents = evidenceBundle.documents();
         if (documents == null || documents.isEmpty()) {
             resultHolder.recordCitations(List.of());
@@ -120,6 +122,12 @@ public class AssistantKnowledgeBaseTool {
             return holder;
         }
         throw new BusinessException("知识库检索缺少结果上下文");
+    }
+
+    private Long readUserId(ToolContext toolContext) {
+        Object value = toolContext.getContext().get(USER_ID_CONTEXT_KEY);
+        if (value instanceof Number number && number.longValue() > 0) return number.longValue();
+        throw new BusinessException("知识库检索缺少用户上下文");
     }
 
     private KnowledgeBaseSearchToolResponse.Evidence toEvidence(Document document) {

@@ -87,7 +87,7 @@ public class AssistantRuntimeMemoryService {
         }
         List<AssistantRuntimeMemoryChange> changes;
         try {
-            changes = extractor.extract(state, loadRecentMessages(sessionId), currentUserMessage);
+            changes = extractor.extract(userId, sessionId, state, loadRecentMessages(sessionId), currentUserMessage);
         } catch (RuntimeException exception) {
             log.warn("Runtime memory extraction failed, skip update. sessionId={}, error={}", sessionId, exception.toString());
             return AssistantRuntimeMemoryDecision.continueWith(currentUserMessage);

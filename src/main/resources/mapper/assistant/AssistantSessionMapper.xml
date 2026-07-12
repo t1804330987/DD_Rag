@@ -9,6 +9,9 @@
         <result property="userId" column="user_id"/>
         <result property="title" column="title"/>
         <result property="status" column="status"/>
+        <result property="currentModelConnectionId" column="current_model_connection_id"/>
+        <result property="currentModelId" column="current_model_id"/>
+        <result property="currentInstructionProfileId" column="current_instruction_profile_id"/>
         <result property="lastMessageAt" column="last_message_at"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
@@ -20,6 +23,9 @@
             user_id,
             title,
             status,
+            current_model_connection_id,
+            current_model_id,
+            current_instruction_profile_id,
             last_message_at,
             created_at,
             updated_at
@@ -28,6 +34,9 @@
             #{userId},
             #{title},
             #{status},
+            #{currentModelConnectionId},
+            #{currentModelId},
+            #{currentInstructionProfileId},
             #{lastMessageAt},
             #{createdAt},
             #{updatedAt}
@@ -39,6 +48,9 @@
                user_id,
                title,
                status,
+               current_model_connection_id,
+               current_model_id,
+               current_instruction_profile_id,
                last_message_at,
                created_at,
                updated_at
@@ -53,6 +65,9 @@
                user_id,
                title,
                status,
+               current_model_connection_id,
+               current_model_id,
+               current_instruction_profile_id,
                last_message_at,
                created_at,
                updated_at
@@ -77,6 +92,25 @@
             updated_at = #{updatedAt}
         where id = #{sessionId}
           and user_id = #{userId}
+          and status &lt;&gt; 'DELETED'
+    </update>
+
+    <update id="updateCurrentInstructionProfile">
+        update assistant_sessions
+        set current_instruction_profile_id=#{instructionProfileId}, updated_at=#{updatedAt}
+        where id=#{sessionId} and user_id=#{userId} and status &lt;&gt; 'DELETED'
+    </update>
+
+    <update id="updateCurrentModel">
+        update assistant_sessions
+        set current_model_connection_id=#{connectionId}, current_model_id=#{modelId}, updated_at=#{updatedAt}
+        where id=#{sessionId} and user_id=#{userId} and status &lt;&gt; 'DELETED'
+    </update>
+
+    <update id="clearCurrentInstructionProfile">
+        update assistant_sessions
+        set current_instruction_profile_id=null, updated_at=current_timestamp
+        where user_id=#{userId} and current_instruction_profile_id=#{instructionProfileId}
           and status &lt;&gt; 'DELETED'
     </update>
 

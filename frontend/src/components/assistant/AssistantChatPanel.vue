@@ -6,12 +6,14 @@ import type {
   AssistantMessageItem,
   AssistantToolMode,
 } from '../../types/assistant'
+import MarkdownContent from '../MarkdownContent.vue'
 
 const props = defineProps<{
   sessionTitle: string
   selectedSessionId: number | null
   conversationContext: AssistantConversationContext | null
   latestChatResult: AssistantChatResult | null
+  pendingUserMessage: AssistantMessageItem | null
   streamingReply: string
   streamingToolMode: AssistantToolMode | null
   isLoading: boolean
@@ -45,6 +47,12 @@ function resolveRoleLabel(message: AssistantMessageItem) {
   return message.role === 'USER' ? '你' : '助手'
 }
 
+function resolveToolModeLabel(mode: string | null | undefined) {
+  if (mode === 'KB_SEARCH') return '知识库'
+  if (mode === 'CHAT') return '对话'
+  return mode ?? '对话'
+}
+
 const hasStreamingReply = computed(() => props.streamingReply.trim().length > 0)
 const shouldShowStreamingMessage = computed(() => props.isSending || hasStreamingReply.value)
 const messageListRef = ref<HTMLElement | null>(null)
@@ -74,22 +82,31 @@ watch(
 
 <template>
   <section class="assistant-page__column assistant-page__column--chat">
-    <div class="panel__header">
+    <div class="panel__header assistant-chat-panel__header">
       <div>
-        <p class="panel__eyebrow">当前会话</p>
-        <h2>{{ selectedSessionId === null ? '等待会话' : sessionTitle }}</h2>
+        <p class="panel__eyebrow">对话区</p>
+        <h2>{{ selectedSessionId === null ? '新对话' : sessionTitle }}</h2>
       </div>
-      <span class="panel__pill">{{ selectedSessionId === null ? '未选中' : `会话 #${selectedSessionId}` }}</span>
+      <span class="panel__pill">{{ selectedSessionId === null ? '未创建' : `会话 #${selectedSessionId}` }}</span>
     </div>
 
     <p v-if="error" class="feedback feedback--error">{{ error }}</p>
-    <p v-else-if="selectedSessionId === null" class="placeholder-text">
-      先从左侧创建或选择一个会话，再开始连续对话。
-    </p>
-    <p v-else-if="isLoading" class="placeholder-text">正在恢复会话上下文...</p>
+    <div
+      v-else-if="selectedSessionId === null && pendingUserMessage === null"
+      class="assistant-chat-empty"
+    >
+      <strong>从第一条消息开始</strong>
+      <p>选好模型和指令后直接发送。首次发送会自动建会话，后续可在左侧继续。</p>
+    </div>
+    <div v-else-if="isLoading" class="assistant-chat-loading" aria-live="polite">
+      <div class="assistant-chat-loading__line" />
+      <div class="assistant-chat-loading__line assistant-chat-loading__line--short" />
+      <div class="assistant-chat-loading__line assistant-chat-loading__line--mid" />
+      <span>正在恢复会话上下文…</span>
+    </div>
     <div v-else class="assistant-chat-panel">
       <section
-        v-if="conversationContext?.recentMessages?.length || shouldShowStreamingMessage"
+        v-if="conversationContext?.recentMessages?.length || pendingUserMessage !== null || shouldShowStreamingMessage"
         ref="messageListRef"
         class="assistant-message-list"
       >
@@ -99,38 +116,80 @@ watch(
           class="assistant-message"
           :class="message.role === 'USER' ? 'assistant-message--user' : 'assistant-message--assistant'"
         >
-          <header class="assistant-message__meta">
-            <strong>{{ resolveRoleLabel(message) }}</strong>
-            <span>{{ message.toolMode ?? 'CHAT' }}</span>
-            <time :datetime="message.createdAt">{{ formatTime(message.createdAt) }}</time>
-          </header>
-          <p class="assistant-message__body">{{ message.content }}</p>
-          <div v-if="resolveCitations(message).length > 0" class="assistant-message__citations">
-            <span>引用文件</span>
-            <ul>
-              <li v-for="citation in resolveCitations(message)" :key="`${message.messageId}-${citation.fileName}`">
-                {{ citation.fileName }}
-              </li>
-            </ul>
+          <div class="assistant-message__avatar" aria-hidden="true">
+            {{ message.role === 'USER' ? '你' : 'AI' }}
+          </div>
+          <div class="assistant-message__bubble">
+            <header class="assistant-message__meta">
+              <strong>{{ resolveRoleLabel(message) }}</strong>
+              <span class="assistant-message__badge">{{ resolveToolModeLabel(message.toolMode) }}</span>
+              <time :datetime="message.createdAt">{{ formatTime(message.createdAt) }}</time>
+            </header>
+            <MarkdownContent
+              class="assistant-message__body"
+              :content="message.content"
+              :mode="message.role === 'USER' ? 'plain' : 'markdown'"
+              :show-copy="message.role !== 'USER'"
+            />
+            <div v-if="resolveCitations(message).length > 0" class="assistant-message__citations">
+              <span>引用文件</span>
+              <ul>
+                <li v-for="citation in resolveCitations(message)" :key="`${message.messageId}-${citation.fileName}`">
+                  {{ citation.fileName }}
+                </li>
+              </ul>
+            </div>
+          </div>
+        </article>
+        <article
+          v-if="pendingUserMessage !== null"
+          class="assistant-message assistant-message--user"
+        >
+          <div class="assistant-message__avatar" aria-hidden="true">你</div>
+          <div class="assistant-message__bubble">
+            <header class="assistant-message__meta">
+              <strong>你</strong>
+              <span class="assistant-message__badge">{{ resolveToolModeLabel(pendingUserMessage.toolMode) }}</span>
+              <time :datetime="pendingUserMessage.createdAt">{{ formatTime(pendingUserMessage.createdAt) }}</time>
+            </header>
+            <MarkdownContent
+              class="assistant-message__body"
+              :content="pendingUserMessage.content"
+              mode="plain"
+            />
           </div>
         </article>
         <article
           v-if="shouldShowStreamingMessage"
           class="assistant-message assistant-message--assistant assistant-message--streaming"
         >
-          <header class="assistant-message__meta">
-            <strong>助手</strong>
-            <span>{{ streamingToolMode ?? 'CHAT' }}</span>
-            <span>生成中</span>
-          </header>
-          <p class="assistant-message__body">{{ streamingReply }}</p>
+          <div class="assistant-message__avatar" aria-hidden="true">AI</div>
+          <div class="assistant-message__bubble">
+            <header class="assistant-message__meta">
+              <strong>助手</strong>
+              <span class="assistant-message__badge">{{ resolveToolModeLabel(streamingToolMode) }}</span>
+              <span class="assistant-message__live">
+                <i class="assistant-message__pulse" />
+                生成中
+              </span>
+            </header>
+            <MarkdownContent
+              v-if="hasStreamingReply"
+              class="assistant-message__body"
+              :content="streamingReply"
+              mode="markdown"
+              streaming
+            />
+            <p v-else class="assistant-message__thinking">正在组织回答…</p>
+          </div>
         </article>
       </section>
-      <p v-else class="placeholder-text">
-        当前会话还没有历史消息。发送第一条消息后，这里会持续显示最近上下文。
-      </p>
+      <div v-else class="assistant-chat-empty assistant-chat-empty--compact">
+        <strong>会话已就绪</strong>
+        <p>还没有消息。在下方输入问题，回复会出现在这里。</p>
+      </div>
 
-      <p v-if="isSending" class="assistant-chat-panel__sending">助手正在处理中...</p>
+      <p v-if="isSending" class="assistant-chat-panel__sending">助手正在生成回复…</p>
     </div>
   </section>
 </template>

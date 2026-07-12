@@ -14,15 +14,17 @@ const route = useRoute()
 const authStore = useAuthStore()
 
 const businessNavItems: NavItem[] = [
-  { to: '/groups', label: '协作小组', caption: '成员、权限与申请' },
-  { to: '/documents', label: '文档中心', caption: '上传、索引与管理' },
-  { to: '/qa', label: '智能检索', caption: '单轮检索与证据核对' },
-  { to: '/assistant', label: '个人智能助手', caption: '多轮会话与偏好记忆' },
+  { to: '/groups', label: '我的组', caption: '建组、成员与申请' },
+  { to: '/documents', label: '文档中心', caption: '上传、索引与预览' },
+  { to: '/qa', label: '知识问答', caption: '单轮提问与证据核对' },
+  { to: '/assistant', label: '个人助手', caption: '多轮对话与检索' },
+  { to: '/ai-settings', label: 'AI 设置', caption: '模型、指令与用量' },
 ]
 
 const adminNavItems: NavItem[] = [
-  { to: '/admin/overview', label: '后台首页', caption: '总览、提醒与快捷入口' },
-  { to: '/admin/users', label: '用户管理', caption: '账号、角色与状态' },
+  { to: '/admin/overview', label: '后台首页', caption: '总览与快捷入口' },
+  { to: '/admin/users', label: '用户管理', caption: '账号与角色' },
+  { to: '/admin/model-governance', label: '模型治理', caption: '连接、授权与用量' },
 ]
 
 const navItems = computed(() => (authStore.isAdmin ? adminNavItems : businessNavItems))
@@ -44,11 +46,11 @@ function isActive(targetPath: string) {
 <template>
   <div class="workbench-sidebar">
     <RouterLink class="workbench-sidebar__brand" :to="authStore.homePath">
-      <span class="workbench-sidebar__eyebrow">产品品牌</span>
-      <strong>DD RAG</strong>
-      <span class="workbench-sidebar__brand-subtitle">共享工作台</span>
-      <span class="workbench-sidebar__brand-description">统一承载分组、文档、检索、助手与后台入口</span>
-      <span class="workbench-sidebar__brand-tag">分组 / 文档 / 检索 / 助手</span>
+      <span class="workbench-sidebar__eyebrow">DD RAG</span>
+      <strong>知识工作台</strong>
+      <span class="workbench-sidebar__brand-subtitle">组内知识协作</span>
+      <span class="workbench-sidebar__brand-description">管理组与文档，用问答和助手基于证据回答问题。</span>
+      <span class="workbench-sidebar__brand-tag">组 · 文档 · 问答 · 助手</span>
     </RouterLink>
 
     <nav class="workbench-sidebar__nav" aria-label="系统导航">

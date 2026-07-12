@@ -22,10 +22,10 @@ function handleFocus(section: WorkspaceNodeType) {
   <section class="groups-summary">
     <div class="groups-summary__heading">
       <div>
-        <p class="groups-summary__eyebrow">组工作台</p>
-        <h2>我的组</h2>
+        <p class="groups-summary__eyebrow">概览</p>
+        <h2>组一览</h2>
         <p class="groups-summary__intro">
-          先选择一个对象，再在右侧完成邀请审批、成员管理或退出操作。
+          点选一类组，再在中间完成邀请、成员或退出操作。
         </p>
       </div>
       <button class="primary-button groups-summary__create" type="button" @click="emit('create')">
@@ -40,9 +40,9 @@ function handleFocus(section: WorkspaceNodeType) {
         type="button"
         @click="handleFocus('ownedGroup')"
       >
-        <span class="groups-summary__label">我拥有的组</span>
+        <span class="groups-summary__label">我拥有的</span>
         <strong>{{ ownedCount }}</strong>
-        <small>点击查看你拥有的知识库空间</small>
+        <small>进入你管理的知识库</small>
       </button>
 
       <button
@@ -51,9 +51,9 @@ function handleFocus(section: WorkspaceNodeType) {
         type="button"
         @click="handleFocus('joinedGroup')"
       >
-        <span class="groups-summary__label">我加入的组</span>
+        <span class="groups-summary__label">我加入的</span>
         <strong>{{ joinedCount }}</strong>
-        <small>点击查看你加入的知识库空间</small>
+        <small>进入你参与的知识库</small>
       </button>
 
       <button
@@ -64,10 +64,10 @@ function handleFocus(section: WorkspaceNodeType) {
       >
         <span class="groups-summary__label">
           待处理邀请
-          <span v-if="invitationCount > 0" class="groups-summary__badge">待处理</span>
+          <span v-if="invitationCount > 0" class="groups-summary__badge">待办</span>
         </span>
         <strong>{{ invitationCount }}</strong>
-        <small>点击优先处理邀请事项</small>
+        <small>优先处理邀请</small>
       </button>
     </div>
   </section>
@@ -87,10 +87,12 @@ function handleFocus(section: WorkspaceNodeType) {
 }
 
 .groups-summary__eyebrow {
-  margin: 0 0 0.35rem;
-  font-size: 0.74rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  margin: 0 0 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  text-transform: none;
   color: #195a76;
 }
 
@@ -118,17 +120,19 @@ function handleFocus(section: WorkspaceNodeType) {
 
 .groups-summary__card {
   display: grid;
-  gap: 0.35rem;
-  padding: 1rem 1.05rem;
-  border-radius: 24px;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.9rem 0.95rem;
+  border-radius: 0.7rem;
   border: 1px solid rgba(16, 42, 59, 0.08);
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.9);
   color: #102a3b;
   text-align: left;
+  overflow: visible;
   transition:
-    transform 0.22s ease,
-    border-color 0.22s ease,
-    box-shadow 0.22s ease;
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .groups-summary__card:hover {
@@ -138,8 +142,8 @@ function handleFocus(section: WorkspaceNodeType) {
 }
 
 .groups-summary__card strong {
-  font-size: clamp(1.9rem, 3vw, 2.6rem);
-  line-height: 1;
+  font-size: clamp(1.7rem, 2.4vw, 2.3rem);
+  line-height: 1.15;
 }
 
 .groups-summary__label {
@@ -152,8 +156,8 @@ function handleFocus(section: WorkspaceNodeType) {
 }
 
 .groups-summary__badge {
-  padding: 0.16rem 0.48rem;
-  border-radius: 999px;
+  padding: 0.14rem 0.42rem;
+  border-radius: 0.4rem;
   background: rgba(226, 111, 60, 0.14);
   color: #9b3f1b;
   font-size: 0.72rem;

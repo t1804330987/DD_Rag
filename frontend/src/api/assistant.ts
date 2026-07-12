@@ -3,10 +3,18 @@ import type {
   AssistantChatPayload,
   AssistantChatResult,
   AssistantChatStreamEvent,
+  AssistantAvailableModel,
   AssistantConversationContext,
   AssistantSessionDetail,
   AssistantSessionListItem,
 } from '../types/assistant'
+
+function unwrap<T>(response: ApiResponse<T>, fallbackMessage: string): T {
+  if (!response.success || response.data == null) {
+    throw new Error(response.message ?? fallbackMessage)
+  }
+  return response.data
+}
 
 export async function createAssistantSession(): Promise<AssistantSessionDetail> {
   const { data } = await http.post<ApiResponse<AssistantSessionDetail>>('/assistant/sessions')
@@ -19,6 +27,11 @@ export async function createAssistantSession(): Promise<AssistantSessionDetail> 
 export async function fetchAssistantSessions(): Promise<AssistantSessionListItem[]> {
   const { data } = await http.get<AssistantSessionListItem[]>('/assistant/sessions')
   return data
+}
+
+export async function fetchAvailableAssistantModels(): Promise<AssistantAvailableModel[]> {
+  const { data } = await http.get<ApiResponse<AssistantAvailableModel[]>>('/assistant/sessions/models')
+  return unwrap(data, '加载可用模型失败')
 }
 
 export async function fetchAssistantSessionDetail(sessionId: number): Promise<AssistantSessionDetail> {
@@ -44,6 +57,28 @@ export async function deleteAssistantSession(sessionId: number): Promise<void> {
 export async function fetchAssistantConversationContext(sessionId: number): Promise<AssistantConversationContext> {
   const { data } = await http.get<AssistantConversationContext>(`/assistant/sessions/${sessionId}/context`)
   return data
+}
+
+export async function selectAssistantSessionModel(
+  sessionId: number,
+  connectionId: number,
+  modelId: number,
+): Promise<void> {
+  const { data } = await http.patch<ApiResponse<null>>(`/assistant/sessions/${sessionId}/model`, {
+    connectionId,
+    modelId,
+  })
+  if (!data.success) throw new Error(data.message ?? '更新会话模型失败')
+}
+
+export async function selectAssistantSessionInstruction(
+  sessionId: number,
+  instructionProfileId: number | null,
+): Promise<void> {
+  const { data } = await http.patch<ApiResponse<null>>(`/assistant/sessions/${sessionId}/instruction-profile`, {
+    instructionProfileId,
+  })
+  if (!data.success) throw new Error(data.message ?? '更新会话个人指令失败')
 }
 
 export async function sendAssistantMessage(payload: AssistantChatPayload): Promise<AssistantChatResult> {

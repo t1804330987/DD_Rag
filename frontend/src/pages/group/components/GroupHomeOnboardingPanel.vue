@@ -36,10 +36,10 @@ function handleJoinGroupCodeInput(event: Event) {
       <div class="group-home-onboarding__copy">
         <p class="group-home-onboarding__eyebrow">开始使用</p>
         <h2>
-          {{ hasAnyWorkspaceItem ? (hasSelection ? '当前工作台已就绪' : '先选一个知识库进入工作流') : '先建立或加入你的第一个知识库' }}
+          {{ hasAnyWorkspaceItem ? (hasSelection ? '工作台已就绪' : '从左侧选择一个组开始') : '创建或加入第一个组' }}
         </h2>
         <p>
-          当前用户是 {{ currentUserLabel }}。你现在位于“我的组”，这里负责确定当前协作空间，再继续进入文档管理和问答工作台。
+          你好，{{ currentUserLabel }}。先在这里确定协作组，再去文档中心上传资料，或在问答/助手中基于证据提问。
         </p>
       </div>
 
@@ -62,9 +62,9 @@ function handleJoinGroupCodeInput(event: Event) {
     <section class="group-home-onboarding__steps">
       <article class="group-home-onboarding__step">
         <span class="group-home-onboarding__step-index">01</span>
-        <h3>先确认当前知识库</h3>
-        <p v-if="hasAnyWorkspaceItem">从左侧列表选择一个组或待处理邀请，首页会切换成当前工作区视角。</p>
-        <p v-else>如果还没有任何组，先创建自己的知识库，或向已有知识库提交加入申请。</p>
+        <h3>确认当前组</h3>
+        <p v-if="hasAnyWorkspaceItem">从左侧选择组或待处理邀请，中间会进入对应详情。</p>
+        <p v-else>还没有组时，先创建自己的知识库，或申请加入已有组。</p>
         <div class="group-home-onboarding__actions">
           <button
             v-if="ownedCount > 0"
@@ -96,8 +96,8 @@ function handleJoinGroupCodeInput(event: Event) {
 
       <article class="group-home-onboarding__step">
         <span class="group-home-onboarding__step-index">02</span>
-        <h3>确认资料是否已到位</h3>
-        <p>选中知识库后，去文档中心上传、索引和管理该组资料。</p>
+        <h3>准备文档</h3>
+        <p>选中组后，到文档中心上传并确认索引状态。</p>
         <div class="group-home-onboarding__actions">
           <RouterLink class="ghost-button group-home-onboarding__link" to="/documents">前往文档中心</RouterLink>
         </div>
@@ -105,11 +105,11 @@ function handleJoinGroupCodeInput(event: Event) {
 
       <article class="group-home-onboarding__step">
         <span class="group-home-onboarding__step-index">03</span>
-        <h3>再进入问答工作台</h3>
-        <p>确认当前组后，再去问答页提问，避免在错误的知识库上下文里工作。</p>
+        <h3>开始提问</h3>
+        <p>确认当前组后，再到知识问答或个人助手里提问，避免选错知识库。</p>
         <div class="group-home-onboarding__actions">
-          <RouterLink class="ghost-button group-home-onboarding__link" to="/qa">前往问答工作台</RouterLink>
-          <button class="ghost-button" type="button" @click="emit('openSecurity')">账户安全</button>
+          <RouterLink class="ghost-button group-home-onboarding__link" to="/qa">知识问答</RouterLink>
+          <button class="ghost-button" type="button" @click="emit('openSecurity')">账号安全</button>
         </div>
       </article>
     </section>
@@ -118,25 +118,25 @@ function handleJoinGroupCodeInput(event: Event) {
       <article class="group-home-onboarding__card">
         <div class="group-home-onboarding__card-header">
           <div>
-            <p class="panel__eyebrow">当前待办</p>
-            <h3>当前待办</h3>
+            <p class="panel__eyebrow">待办</p>
+            <h3>接下来做什么</h3>
           </div>
           <span class="panel__pill panel__pill--soft">{{ invitationCount + myJoinRequestCount }}</span>
         </div>
         <ul class="group-home-onboarding__todo">
-          <li v-if="invitationCount > 0">有 {{ invitationCount }} 条邀请等待处理，建议优先确认是否加入。</li>
-          <li v-if="myJoinRequestCount > 0">你有 {{ myJoinRequestCount }} 条加入申请在跟进，可查看最新状态。</li>
-          <li v-if="!hasAnyWorkspaceItem">当前没有知识库上下文，建议先创建组或输入组织 ID 加入。</li>
-          <li v-if="hasAnyWorkspaceItem && !hasSelection">已有组数据，但还没有选中具体工作区。</li>
-          <li>账户安全入口保持可用，敏感操作前可先确认密码状态。</li>
+          <li v-if="invitationCount > 0">有 {{ invitationCount }} 条邀请待处理。</li>
+          <li v-if="myJoinRequestCount > 0">有 {{ myJoinRequestCount }} 条加入申请在跟进。</li>
+          <li v-if="!hasAnyWorkspaceItem">还没有组：先创建，或输入组织 ID 申请加入。</li>
+          <li v-if="hasAnyWorkspaceItem && !hasSelection">已有组，但尚未选中具体工作区。</li>
+          <li>敏感操作前可先检查账号安全状态。</li>
         </ul>
       </article>
 
       <article class="group-home-onboarding__card">
         <div class="group-home-onboarding__card-header">
           <div>
-            <p class="panel__eyebrow">通过组织 ID 加入</p>
-            <h3>加入其他知识库</h3>
+            <p class="panel__eyebrow">加入</p>
+            <h3>用组织 ID 申请</h3>
           </div>
         </div>
 
@@ -149,13 +149,13 @@ function handleJoinGroupCodeInput(event: Event) {
             @input="handleJoinGroupCodeInput"
           />
           <button class="primary-button" :disabled="isSubmittingJoinRequest" type="button" @click="emit('submitJoinRequest')">
-            {{ isSubmittingJoinRequest ? '提交中...' : '提交申请' }}
+            {{ isSubmittingJoinRequest ? '提交中…' : '提交申请' }}
           </button>
         </div>
 
-        <p class="group-home-onboarding__hint">使用页面展示的组织 ID，也就是 groupCode，不是数据库里的数字 ID。</p>
+        <p class="group-home-onboarding__hint">填写页面上的组织 ID（groupCode），不是数字主键。</p>
 
-        <p v-if="isMyRequestsLoading" class="placeholder-text">正在加载我的申请...</p>
+        <p v-if="isMyRequestsLoading" class="placeholder-text">正在加载我的申请…</p>
         <ul v-else-if="myJoinRequests.length > 0" class="join-request-list">
           <li
             v-for="request in myJoinRequests.slice(0, 3)"
@@ -183,15 +183,16 @@ function handleJoinGroupCodeInput(event: Event) {
 
 .group-home-onboarding__hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 0.8fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 0.8fr);
   gap: 1rem;
-  padding: 1.35rem;
-  border-radius: 32px;
+  padding: 1.25rem;
+  border-radius: 0.8rem;
   background:
     radial-gradient(circle at top right, rgba(106, 167, 189, 0.22), transparent 28rem),
     linear-gradient(155deg, rgba(255, 255, 255, 0.98), rgba(233, 244, 248, 0.94));
   border: 1px solid rgba(16, 42, 59, 0.08);
-  box-shadow: 0 28px 70px rgba(13, 40, 58, 0.09);
+  box-shadow: 0 18px 40px rgba(13, 40, 58, 0.07);
+  overflow: visible;
 }
 
 .group-home-onboarding__eyebrow {
@@ -206,6 +207,8 @@ function handleJoinGroupCodeInput(event: Event) {
 .group-home-onboarding__card-header h3 {
   margin: 0;
   color: #102a3b;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .group-home-onboarding__copy p {
@@ -224,9 +227,10 @@ function handleJoinGroupCodeInput(event: Event) {
 .group-home-onboarding__card {
   display: grid;
   gap: 0.45rem;
-  padding: 1rem 1.05rem;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.84);
+  min-width: 0;
+  padding: 0.95rem 1rem;
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(16, 42, 59, 0.08);
 }
 
@@ -256,11 +260,13 @@ function handleJoinGroupCodeInput(event: Event) {
 
 .group-home-onboarding__step {
   display: grid;
-  gap: 0.75rem;
-  padding: 1.1rem;
-  border-radius: 28px;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 1rem;
+  border-radius: 0.7rem;
   border: 1px solid rgba(16, 42, 59, 0.08);
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.9);
+  overflow: visible;
   transition:
     transform 0.24s ease,
     box-shadow 0.24s ease;
@@ -281,6 +287,8 @@ function handleJoinGroupCodeInput(event: Event) {
 .group-home-onboarding__step h3 {
   margin: 0;
   color: #102a3b;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .group-home-onboarding__step p,

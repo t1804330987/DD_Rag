@@ -35,7 +35,7 @@ class AssistantKnowledgeBaseToolTest {
                 new CitationAssembler()
         );
         AssistantKnowledgeBaseToolResultHolder resultHolder = new AssistantKnowledgeBaseToolResultHolder();
-        given(evidenceRetriever.retrieve(2001L, "上传流程是什么"))
+        given(evidenceRetriever.retrieve(1001L, 2001L, "上传流程是什么"))
                 .willReturn(new RetrievedEvidenceBundle(
                         List.of(Document.builder()
                                 .id("E1")
@@ -56,6 +56,7 @@ class AssistantKnowledgeBaseToolTest {
                 "上传流程是什么",
                 new ToolContext(Map.of(
                         "groupId", 2001L,
+                        "userId", 1001L,
                         "knowledgeBaseToolResultHolder", resultHolder
                 ))
         );
@@ -92,6 +93,7 @@ class AssistantKnowledgeBaseToolTest {
                 "再次检索",
                 new ToolContext(Map.of(
                         "groupId", 2001L,
+                        "userId", 1001L,
                         "knowledgeBaseToolResultHolder", resultHolder
                 ))
         );

@@ -5,6 +5,9 @@ import java.time.LocalDateTime;
 public record AssistantSessionListItemVO(
         Long sessionId,
         String title,
-        LocalDateTime lastMessageAt
+        LocalDateTime lastMessageAt,
+        Long currentModelConnectionId,
+        Long currentModelId,
+        Long currentInstructionProfileId
 ) {
 }

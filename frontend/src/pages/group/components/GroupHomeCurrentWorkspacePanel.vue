@@ -58,13 +58,13 @@ function handleInviteeUserIdInput(event: Event) {
   <section class="group-home-current">
     <div class="group-home-current__header">
       <div>
-        <p class="panel__eyebrow">{{ isCreateComposerOpen ? '创建新组' : '组详情' }}</p>
+        <p class="panel__eyebrow">{{ isCreateComposerOpen ? '创建' : '详情' }}</p>
         <h2>{{ isCreateComposerOpen ? '创建新组' : '组详情' }}</h2>
         <p>
           {{
             isCreateComposerOpen
-              ? '创建动作独立展示，不再混进当前组选中详情里。'
-              : '左侧负责进入组详情，这里只保留当前对象的直接信息和操作。'
+              ? '填写名称与描述，创建后可上传文档并邀请成员。'
+              : '左侧选中组后，在这里查看信息并执行成员相关操作。'
           }}
         </p>
       </div>
@@ -73,10 +73,10 @@ function handleInviteeUserIdInput(event: Event) {
     <section v-if="isCreateComposerOpen" class="detail-card detail-card--composer">
       <div class="detail-card__header">
         <div>
-          <p class="panel__eyebrow">创建入口</p>
-          <h2>创建新组</h2>
+          <p class="panel__eyebrow">创建</p>
+          <h2>新组信息</h2>
         </div>
-        <button class="ghost-button" type="button" @click="emit('closeCreate')">取消创建</button>
+        <button class="ghost-button" type="button" @click="emit('closeCreate')">取消</button>
       </div>
 
       <div class="detail-card__stack">
@@ -96,7 +96,7 @@ function handleInviteeUserIdInput(event: Event) {
             :value="createGroupDescription"
             maxlength="512"
             rows="4"
-            placeholder="描述这个知识库空间的用途与边界。"
+            placeholder="说明这个知识库的用途与范围。"
             @input="handleCreateGroupDescriptionInput"
           />
         </label>
@@ -104,7 +104,7 @@ function handleInviteeUserIdInput(event: Event) {
 
       <div class="detail-card__actions">
         <button class="primary-button" :disabled="isCreatingGroup" type="button" @click="emit('createGroup')">
-          {{ isCreatingGroup ? '创建中...' : '创建组' }}
+          {{ isCreatingGroup ? '创建中…' : '创建组' }}
         </button>
       </div>
     </section>
@@ -112,7 +112,7 @@ function handleInviteeUserIdInput(event: Event) {
     <section v-else-if="selectedInvitation" class="detail-card">
       <div class="detail-card__header">
         <div>
-          <p class="panel__eyebrow">待处理邀请</p>
+          <p class="panel__eyebrow">邀请</p>
           <h2>{{ selectedInvitation.groupName }}</h2>
         </div>
       </div>
@@ -132,7 +132,7 @@ function handleInviteeUserIdInput(event: Event) {
             <strong>{{ selectedInvitation.status }}</strong>
           </div>
         </div>
-        <p class="detail-note">接受后该组会进入“我加入的组”，拒绝后会从当前列表中移除。</p>
+        <p class="detail-note">接受后进入「我加入的组」；拒绝后会从列表移除。</p>
       </div>
 
       <div class="detail-card__actions">
@@ -212,7 +212,7 @@ function handleInviteeUserIdInput(event: Event) {
           </label>
           <p class="detail-note">可让对方在“我的组”页右上角查看自己的用户 ID，再把该编号发给你。</p>
 
-          <p v-if="isMembersLoading" class="placeholder-text">正在加载成员列表...</p>
+          <p v-if="isMembersLoading" class="placeholder-text">正在加载成员…</p>
           <ul v-else class="groups-member-list">
             <li v-for="member in groupMembers" :key="`member-${member.userId}`" class="groups-member-list__item">
               <div class="groups-member-list__profile">
@@ -242,8 +242,8 @@ function handleInviteeUserIdInput(event: Event) {
             <span class="panel__pill panel__pill--pending">{{ ownerJoinRequests.length }}</span>
           </div>
 
-          <p v-if="isOwnerRequestsLoading" class="placeholder-text">正在加载待审批申请...</p>
-          <p v-else-if="ownerJoinRequests.length === 0" class="placeholder-text">当前组暂无待审批申请。</p>
+          <p v-if="isOwnerRequestsLoading" class="placeholder-text">正在加载待审批申请…</p>
+          <p v-else-if="ownerJoinRequests.length === 0" class="placeholder-text">暂无待审批申请。</p>
           <ul v-else class="groups-member-list">
             <li
               v-for="request in ownerJoinRequests"
@@ -331,9 +331,9 @@ function handleInviteeUserIdInput(event: Event) {
     </section>
 
     <section v-else class="detail-empty">
-      <p class="detail-empty__eyebrow">尚未选择</p>
-      <h2>请选择左侧一个组或邀请</h2>
-      <p>选择左侧对象后，这里会显示该组或邀请的详情与可执行操作。</p>
+      <p class="detail-empty__eyebrow">未选择</p>
+      <h2>从左侧选择组或邀请</h2>
+      <p>选中后，这里会显示详情和可执行操作。</p>
     </section>
   </section>
 </template>

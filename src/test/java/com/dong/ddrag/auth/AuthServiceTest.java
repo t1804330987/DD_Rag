@@ -177,7 +177,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> jwtAccessTokenService.parse(malformedToken))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("access token 非法或已过期");
+                .hasMessageContaining("登录凭证无效或已过期，请重新登录");
     }
 
     @Test

@@ -10,6 +10,8 @@ import com.dong.ddrag.assistant.model.vo.session.AssistantSessionDetailVO;
 import com.dong.ddrag.assistant.model.vo.session.AssistantSessionListItemVO;
 import com.dong.ddrag.common.exception.BusinessException;
 import com.dong.ddrag.identity.service.CurrentUserService;
+import com.dong.ddrag.modelplatform.service.AssistantInstructionProfileService;
+import com.dong.ddrag.modelplatform.runtime.ModelRuntimeService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,23 +27,65 @@ public class AssistantSessionService {
     private final AssistantMessageMapper assistantMessageMapper;
     private final AssistantSessionContextMapper assistantSessionContextMapper;
     private final CurrentUserService currentUserService;
+    private final AssistantInstructionProfileService instructionProfileService;
+    private final ModelRuntimeService modelRuntimeService;
 
     public AssistantSessionService(
             AssistantSessionMapper assistantSessionMapper,
             AssistantMessageMapper assistantMessageMapper,
             AssistantSessionContextMapper assistantSessionContextMapper,
-            CurrentUserService currentUserService
+            CurrentUserService currentUserService,
+            AssistantInstructionProfileService instructionProfileService,
+            ModelRuntimeService modelRuntimeService
     ) {
         this.assistantSessionMapper = assistantSessionMapper;
         this.assistantMessageMapper = assistantMessageMapper;
         this.assistantSessionContextMapper = assistantSessionContextMapper;
         this.currentUserService = currentUserService;
+        this.instructionProfileService = instructionProfileService;
+        this.modelRuntimeService = modelRuntimeService;
     }
 
     @Transactional
     public AssistantSessionDetailVO createSession(HttpServletRequest request) {
         CurrentUserService.CurrentUser currentUser = currentUserService.requireBusinessUser(request);
-        AssistantSessionEntity entity = buildNewSession(currentUser.userId());
+        return createSessionForUser(currentUser.userId());
+    }
+
+    /** Creates a persisted session for an already authenticated business user. */
+    @Transactional
+    public AssistantSessionDetailVO createSessionForUser(Long userId) {
+        return createSessionForUser(userId, null, null, instructionProfileService.resolveDefault(userId));
+    }
+
+    /** Applies initial user choices before the first Assistant invocation is admitted. */
+    @Transactional
+    public AssistantSessionDetailVO createSessionForUser(
+            Long userId,
+            Long connectionId,
+            Long modelId,
+            Long instructionProfileId
+    ) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException("userId 非法");
+        }
+        if ((connectionId == null) != (modelId == null)) {
+            throw new BusinessException("MODEL_SELECTION_INVALID");
+        }
+        if (connectionId != null) {
+            modelRuntimeService.requireAvailableAssistantModel(userId, connectionId, modelId);
+        }
+        return createSessionForUser(userId, connectionId, modelId,
+                instructionProfileService.resolveForSession(userId, instructionProfileId));
+    }
+
+    private AssistantSessionDetailVO createSessionForUser(
+            Long userId,
+            Long connectionId,
+            Long modelId,
+            AssistantInstructionProfileService.ResolvedInstruction instruction
+    ) {
+        AssistantSessionEntity entity = buildNewSession(userId, connectionId, modelId, instruction.profileId());
         int affectedRows = assistantSessionMapper.insert(entity);
         if (affectedRows != 1 || entity.getId() == null) {
             throw new BusinessException("创建会话失败");
@@ -89,6 +133,28 @@ public class AssistantSessionService {
         int deletedRows = assistantSessionMapper.deleteByIdAndUserId(session.getId(), currentUser.userId());
         if (deletedRows != 1) {
             throw new BusinessException("删除会话失败");
+        }
+    }
+
+    @Transactional
+    public void selectInstructionProfile(HttpServletRequest request, Long sessionId, Long instructionProfileId) {
+        CurrentUserService.CurrentUser currentUser = currentUserService.requireBusinessUser(request);
+        requireOwnedSession(requireSessionId(sessionId), currentUser.userId());
+        instructionProfileService.resolveForSession(currentUser.userId(), instructionProfileId);
+        if (assistantSessionMapper.updateCurrentInstructionProfile(sessionId, currentUser.userId(), instructionProfileId,
+                LocalDateTime.now()) != 1) {
+            throw new BusinessException("更新会话个人指令失败");
+        }
+    }
+
+    @Transactional
+    public void selectModel(HttpServletRequest request, Long sessionId, Long connectionId, Long modelId) {
+        CurrentUserService.CurrentUser currentUser = currentUserService.requireBusinessUser(request);
+        requireOwnedSession(requireSessionId(sessionId), currentUser.userId());
+        modelRuntimeService.requireAvailableAssistantModel(currentUser.userId(), connectionId, modelId);
+        if (assistantSessionMapper.updateCurrentModel(sessionId, currentUser.userId(), connectionId, modelId,
+                LocalDateTime.now()) != 1) {
+            throw new BusinessException("更新会话模型失败");
         }
     }
 
@@ -157,12 +223,15 @@ public class AssistantSessionService {
         return normalized.length() <= maxLength ? normalized : normalized.substring(0, maxLength).trim();
     }
 
-    private AssistantSessionEntity buildNewSession(Long userId) {
+    private AssistantSessionEntity buildNewSession(Long userId, Long connectionId, Long modelId, Long instructionProfileId) {
         LocalDateTime now = LocalDateTime.now();
         AssistantSessionEntity entity = new AssistantSessionEntity();
         entity.setUserId(userId);
         entity.setTitle(DEFAULT_SESSION_TITLE);
         entity.setStatus(AssistantSessionStatus.ACTIVE.name());
+        entity.setCurrentModelConnectionId(connectionId);
+        entity.setCurrentModelId(modelId);
+        entity.setCurrentInstructionProfileId(instructionProfileId);
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
         return entity;
@@ -172,7 +241,10 @@ public class AssistantSessionService {
         return new AssistantSessionListItemVO(
                 entity.getId(),
                 entity.getTitle(),
-                entity.getLastMessageAt()
+                entity.getLastMessageAt(),
+                entity.getCurrentModelConnectionId(),
+                entity.getCurrentModelId(),
+                entity.getCurrentInstructionProfileId()
         );
     }
 
@@ -182,7 +254,10 @@ public class AssistantSessionService {
                 entity.getTitle(),
                 entity.getStatus(),
                 entity.getLastMessageAt(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getCurrentModelConnectionId(),
+                entity.getCurrentModelId(),
+                entity.getCurrentInstructionProfileId()
         );
     }
 }

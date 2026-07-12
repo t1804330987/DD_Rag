@@ -3,7 +3,29 @@ spring:
     name: dd-rag
   profiles:
     active: dev
+  autoconfigure:
+    exclude:
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAgentAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeChatAutoConfiguration
+      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeEmbeddingAutoConfiguration
   servlet:
     multipart:
       max-file-size: 256MB
       max-request-size: 256MB
+
+ddrag:
+  model-runtime:
+    assistant:
+      max-active-turns: 50
+    invocation:
+      global-limit: 50
+      per-user-limit: 2
+      default-connection-limit: 50
+    stream:
+      executor-threads: 50
+      queue-capacity: 0
+    timeout:
+      first-token: 60s
+      idle: 45s
+      business-total: 5m
+      transport-hard: 6m

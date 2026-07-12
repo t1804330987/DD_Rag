@@ -16,6 +16,8 @@ const currentUserCode = computed(() => authStore.currentUser?.userCode ?? 'ADMIN
 const heroDescription = computed(() =>
   route.path === '/admin/overview'
     ? '后台首页先呈现系统账号的全局态势，再引导进入具体治理动作。'
+    : route.path === '/admin/model-governance'
+      ? '平台模型连接、业务用户授权、场景路由与调用账本均通过管理员后端接口治理。'
     : route.path.startsWith('/admin/users/') && route.path !== '/admin/users'
       ? '单账号详情页集中展示身份与状态，减少列表页的视觉负担。'
       : '管理区只负责系统账号、角色与状态治理，不自动获得任何组内 OWNER/MEMBER 权限。',
@@ -23,6 +25,8 @@ const heroDescription = computed(() =>
 const activeSectionLabel = computed(() =>
   route.path === '/admin/overview'
     ? '后台首页'
+    : route.path === '/admin/model-governance'
+      ? '模型治理'
     : route.path.startsWith('/admin/users/') && route.path !== '/admin/users'
       ? '用户详情'
       : '用户管理',
@@ -43,6 +47,7 @@ const activeSectionLabel = computed(() =>
               <nav class="admin-local-nav" aria-label="管理员导航">
                 <RouterLink to="/admin/overview" active-class="is-active">后台首页</RouterLink>
                 <RouterLink to="/admin/users" active-class="is-active">用户管理</RouterLink>
+                <RouterLink to="/admin/model-governance" active-class="is-active">模型治理</RouterLink>
                 <RouterLink to="/account/security" active-class="is-active">账户安全</RouterLink>
               </nav>
             </div>

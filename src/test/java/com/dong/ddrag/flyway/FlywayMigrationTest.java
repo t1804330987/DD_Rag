@@ -72,7 +72,15 @@ class FlywayMigrationTest {
                 "ingestion_jobs",
                 "assistant_sessions",
                 "assistant_messages",
-                "assistant_session_contexts"
+                "assistant_session_contexts",
+                "model_connections",
+                "model_connection_models",
+                "model_connection_grants",
+                "model_scenario_routes",
+                "assistant_instruction_profiles",
+                "assistant_instruction_profile_versions",
+                "assistant_turn_requests",
+                "model_call_ledger"
         );
         List<String> indexes = List.of(
                 "idx_groups_owner_user",
@@ -90,21 +98,47 @@ class FlywayMigrationTest {
                 "idx_ingestion_jobs_status_retry",
                 "idx_assistant_sessions_user_id",
                 "idx_assistant_sessions_last_message_at",
-                "idx_assistant_messages_session_id"
+                "idx_assistant_messages_session_id",
+                "uk_assistant_turn_requests_user_request",
+                "uk_model_call_ledger_invocation",
+                "idx_model_connections_owner_status",
+                "idx_model_connection_models_connection_enabled",
+                "idx_model_connection_models_visible",
+                "idx_model_call_ledger_status_started"
         );
 
         assertThat(jdbcTemplate.queryForObject("select current_database()", String.class)).isEqualTo(TEST_DATABASE);
-        assertThat(currentFlywayVersion()).isEqualTo("14");
+        assertThat(currentFlywayVersion()).isEqualTo("16");
         assertThat(tables).allSatisfy(table -> assertThat(hasTable(table)).isTrue());
         assertThat(indexes).allSatisfy(index -> assertThat(hasIndex(index)).isTrue());
         assertThat(hasConstraint("ck_group_join_requests_status")).isTrue();
         assertThat(hasConstraint("ck_assistant_sessions_status")).isTrue();
         assertThat(hasConstraint("ck_assistant_messages_role")).isTrue();
+        assertThat(hasConstraint("ck_model_connections_last_test_status")).isTrue();
+        assertThat(hasConstraint("ck_model_connection_models_test_result")).isTrue();
+        assertThat(hasConstraint("ck_model_connection_models_enabled")).isTrue();
+        assertThat(hasConstraint("ck_assistant_turn_requests_status")).isTrue();
+        assertThat(hasConstraint("ck_assistant_turn_requests_completion")).isTrue();
+        assertThat(hasConstraint("fk_model_call_ledger_model_connection")).isTrue();
+        assertThat(hasConstraint("fk_model_call_ledger_instruction_version")).isTrue();
+        assertThat(hasConstraint("ck_model_call_ledger_scenario")).isTrue();
         assertThat(hasColumn("groups", "description")).isTrue();
         assertThat(hasColumn("documents", "preview_text")).isTrue();
         assertThat(hasColumn("documents", "file_hash")).isTrue();
         assertThat(hasColumn("assistant_messages", "structured_payload")).isTrue();
         assertThat(hasColumn("assistant_session_contexts", "runtime_memory_state")).isTrue();
+        assertThat(hasColumn("assistant_sessions", "current_model_connection_id")).isTrue();
+        assertThat(hasColumn("assistant_sessions", "current_model_id")).isTrue();
+        assertThat(hasColumn("assistant_sessions", "current_instruction_profile_id")).isTrue();
+        assertThat(hasColumn("assistant_instruction_profiles", "deleted_at")).isTrue();
+        assertThat(hasColumn("model_connections", "credential_storage_type")).isTrue();
+        assertThat(hasColumn("model_connections", "credential_version")).isTrue();
+        assertThat(hasColumn("model_connection_models", "hidden_at")).isTrue();
+        assertThat(hasColumn("model_call_ledger", "logical_status")).isTrue();
+        assertThat(hasColumn("model_call_ledger", "transport_status")).isTrue();
+        assertThat(foreignKeyDeleteAction("model_call_ledger_session_id_fkey")).isEqualTo("SET NULL");
+        assertThat(foreignKeyDeleteAction("model_call_ledger_connection_id_fkey")).isEqualTo("SET NULL");
+        assertThat(foreignKeyDeleteAction("fk_model_call_ledger_model_connection")).isEqualTo("SET NULL");
         assertThat(hasTaskFourSeedMemberships()).isTrue();
         assertThat(hasTaskFourPendingInvitation()).isTrue();
     }
@@ -205,6 +239,19 @@ class FlywayMigrationTest {
                 constraintName
         );
         return count != null && count > 0;
+    }
+
+    private String foreignKeyDeleteAction(String constraintName) {
+        return jdbcTemplate.queryForObject(
+                """
+                select rc.delete_rule
+                from information_schema.referential_constraints rc
+                where rc.constraint_schema = 'public'
+                  and rc.constraint_name = ?
+                """,
+                String.class,
+                constraintName
+        );
     }
 
     private boolean hasUserCode(String userCode) {

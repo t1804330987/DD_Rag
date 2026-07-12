@@ -43,7 +43,7 @@ function handleJoinGroupCodeInput(event: Event) {
       <article class="group-home-overview__card group-home-overview__card--pending-summary">
         <div class="group-home-overview__header">
           <div>
-            <p class="panel__eyebrow">待处理汇总</p>
+            <p class="panel__eyebrow">待办</p>
             <h3>待处理事项</h3>
           </div>
           <span class="panel__pill panel__pill--pending">{{ totalPendingCount }}</span>
@@ -51,20 +51,20 @@ function handleJoinGroupCodeInput(event: Event) {
 
         <div class="group-home-overview__pending-total">
           <strong>{{ totalPendingCount }}</strong>
-          <span>邀请、加入申请和当前组审批事项会汇总到这里，帮助你快速判断是否需要先处理待办。</span>
+          <span>汇总邀请、我的申请与当前组审批，方便先处理待办。</span>
         </div>
       </article>
 
       <article class="group-home-overview__card">
         <div class="group-home-overview__header">
           <div>
-            <p class="panel__eyebrow">最近邀请</p>
+            <p class="panel__eyebrow">邀请</p>
             <h3>最近邀请</h3>
           </div>
           <span class="panel__pill panel__pill--pending">{{ pendingInvitations.length }}</span>
         </div>
 
-        <p v-if="pendingInvitations.length === 0" class="placeholder-text">目前没有新的邀请事项。</p>
+        <p v-if="pendingInvitations.length === 0" class="placeholder-text">暂无新邀请。</p>
         <ul v-else class="group-home-overview__list">
           <li v-for="invitation in pendingInvitations.slice(0, 3)" :key="`overview-invitation-${invitation.invitationId}`">
             <strong>{{ invitation.groupName }}</strong>
@@ -76,14 +76,14 @@ function handleJoinGroupCodeInput(event: Event) {
       <article class="group-home-overview__card">
         <div class="group-home-overview__header">
           <div>
-            <p class="panel__eyebrow">我的申请</p>
+            <p class="panel__eyebrow">申请</p>
             <h3>我的申请</h3>
           </div>
           <span class="panel__pill panel__pill--soft">{{ myJoinRequests.length }}</span>
         </div>
 
-        <p v-if="isMyRequestsLoading" class="placeholder-text">正在加载我的申请...</p>
-        <p v-else-if="myJoinRequests.length === 0" class="placeholder-text">暂时没有待跟进的加入申请。</p>
+        <p v-if="isMyRequestsLoading" class="placeholder-text">正在加载申请…</p>
+        <p v-else-if="myJoinRequests.length === 0" class="placeholder-text">暂无跟进中的申请。</p>
         <ul v-else class="group-home-overview__list">
           <li v-for="request in myJoinRequests.slice(0, 3)" :key="`overview-request-${request.requestId}`">
             <strong>{{ request.groupName }}</strong>
@@ -95,12 +95,12 @@ function handleJoinGroupCodeInput(event: Event) {
       <article class="group-home-overview__card group-home-overview__card--join">
         <div class="group-home-overview__header">
           <div>
-            <p class="panel__eyebrow">快速加入</p>
-            <h3>加入其他知识库</h3>
+            <p class="panel__eyebrow">加入</p>
+            <h3>用组织 ID 申请</h3>
           </div>
         </div>
 
-        <p class="group-home-overview__copy">输入组织 ID（groupCode），快速把新的协作空间纳入当前工作台。</p>
+        <p class="group-home-overview__copy">输入组织 ID（groupCode）申请加入其他知识库。</p>
         <div class="groups-inline-form">
           <input
             :value="joinGroupCode"
@@ -110,10 +110,10 @@ function handleJoinGroupCodeInput(event: Event) {
             @input="handleJoinGroupCodeInput"
           />
           <button class="primary-button" :disabled="isSubmittingJoinRequest" type="button" @click="emit('submitJoinRequest')">
-            {{ isSubmittingJoinRequest ? '提交中...' : '提交申请' }}
+            {{ isSubmittingJoinRequest ? '提交中…' : '提交申请' }}
           </button>
         </div>
-        <p class="group-home-overview__hint">这里只接受组织 ID，不接受数据库内部数字 ID。</p>
+        <p class="group-home-overview__hint">填写页面上的组织 ID，不是数字主键。</p>
       </article>
     </div>
   </section>
@@ -133,11 +133,13 @@ function handleJoinGroupCodeInput(event: Event) {
 
 .group-home-overview__card {
   display: grid;
-  gap: 0.85rem;
-  padding: 1.1rem;
-  border-radius: 28px;
+  gap: 0.8rem;
+  min-width: 0;
+  padding: 1rem;
+  border-radius: 0.75rem;
   border: 1px solid rgba(16, 42, 59, 0.08);
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.92);
+  overflow: visible;
 }
 
 .group-home-overview__card--join {
@@ -159,6 +161,8 @@ function handleJoinGroupCodeInput(event: Event) {
 .group-home-overview__header h3 {
   margin: 0;
   color: #102a3b;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .group-home-overview__list {
@@ -171,9 +175,10 @@ function handleJoinGroupCodeInput(event: Event) {
 
 .group-home-overview__list li {
   display: grid;
-  gap: 0.2rem;
-  padding: 0.8rem 0.9rem;
-  border-radius: 18px;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.7rem;
   background: rgba(245, 250, 253, 0.86);
   border: 1px solid rgba(16, 42, 59, 0.06);
 }

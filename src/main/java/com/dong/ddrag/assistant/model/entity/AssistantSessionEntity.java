@@ -8,6 +8,9 @@ public class AssistantSessionEntity {
     private Long userId;
     private String title;
     private String status;
+    private Long currentModelConnectionId;
+    private Long currentModelId;
+    private Long currentInstructionProfileId;
     private LocalDateTime lastMessageAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -38,6 +41,30 @@ public class AssistantSessionEntity {
 
     public String getStatus() {
         return status;
+    }
+
+    public Long getCurrentModelConnectionId() {
+        return currentModelConnectionId;
+    }
+
+    public void setCurrentModelConnectionId(Long currentModelConnectionId) {
+        this.currentModelConnectionId = currentModelConnectionId;
+    }
+
+    public Long getCurrentModelId() {
+        return currentModelId;
+    }
+
+    public void setCurrentModelId(Long currentModelId) {
+        this.currentModelId = currentModelId;
+    }
+
+    public Long getCurrentInstructionProfileId() {
+        return currentInstructionProfileId;
+    }
+
+    public void setCurrentInstructionProfileId(Long currentInstructionProfileId) {
+        this.currentInstructionProfileId = currentInstructionProfileId;
     }
 
     public void setStatus(String status) {

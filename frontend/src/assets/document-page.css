@@ -50,8 +50,8 @@
 }
 
 .page-shell--documents .page-header-hero h1 {
-  font-size: clamp(2rem, 1.8vw + 1.05rem, 2.7rem);
-  line-height: 1.02;
+  font-size: clamp(1.7rem, 1.3vw + 1.05rem, 2.25rem);
+  line-height: 1.18;
 }
 
 .page-shell--documents .page-header-hero p {
@@ -80,9 +80,9 @@
 .document-upload-progress {
   display: grid;
   gap: 0.45rem;
-  padding: 0.8rem 1rem;
+  padding: 0.75rem 0.9rem;
   border: 1px solid rgba(49, 95, 131, 0.16);
-  border-radius: 1rem;
+  border-radius: 0.7rem;
   background: rgba(244, 248, 252, 0.92);
 }
 
@@ -114,12 +114,12 @@
 .document-toolbar,
 .document-status-board,
 .documents-page__results {
-  gap: 1rem;
-  padding: 1.25rem;
-  border: 1px solid rgba(98, 128, 158, 0.16);
-  border-radius: 1.35rem;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: var(--page-panel-shadow);
+  gap: 0.9rem;
+  padding: 1.05rem;
+  border: 1px solid rgba(98, 128, 158, 0.14);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 28px rgba(16, 32, 51, 0.06);
 }
 
 .document-toolbar > .panel__header h2,
@@ -127,13 +127,13 @@
 .document-status-board__panel-header h2,
 .document-preview-panel h2 {
   font-size: 1.02rem;
-  line-height: 1.22;
+  line-height: 1.3;
 }
 
 .document-toolbar > .panel__header .panel__eyebrow,
 .documents-page__results > .panel__header .panel__eyebrow {
   font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.04em;
 }
 
 .document-toolbar__primary {
@@ -159,12 +159,14 @@
 .document-toolbar__field input,
 .document-toolbar__field select,
 .document-filter-form__field input {
-  min-height: 2.95rem;
-  padding: 0 0.95rem;
+  min-height: 2.45rem;
+  min-width: 0;
+  padding: 0 0.8rem;
   border: 1px solid rgba(98, 128, 158, 0.18);
-  border-radius: 1rem;
-  background: rgba(248, 251, 253, 0.94);
+  border-radius: 0.65rem;
+  background: rgba(248, 251, 253, 0.96);
   color: #163047;
+  line-height: 1.35;
 }
 
 .document-toolbar__select-wrap {
@@ -200,10 +202,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.8rem;
-  padding: 0.7rem 1rem;
+  min-height: 2.45rem;
+  padding: 0.55rem 0.9rem;
   border: 1px dashed rgba(49, 95, 131, 0.34);
-  border-radius: 999px;
+  border-radius: 0.55rem;
   background: rgba(49, 107, 149, 0.08);
   color: #244965;
   cursor: pointer;
@@ -229,20 +231,22 @@
 
 .document-status-board__card,
 .document-status-board__panel {
-  padding: 1rem;
-  border-radius: 1.12rem;
-  background: rgba(245, 249, 252, 0.9);
+  min-width: 0;
+  padding: 0.85rem 0.9rem;
+  border-radius: 0.7rem;
+  background: rgba(245, 249, 252, 0.92);
   border: 1px solid rgba(98, 128, 158, 0.12);
+  overflow: visible;
 }
 
 .document-status-board__card {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .document-status-board__card strong {
-  font-size: 1.6rem;
-  line-height: 1;
+  font-size: 1.4rem;
+  line-height: 1.15;
 }
 
 .document-status-board__card[data-tone='ready'] { background: rgba(34, 122, 88, 0.08); }

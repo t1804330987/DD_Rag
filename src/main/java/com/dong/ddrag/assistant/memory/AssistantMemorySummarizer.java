@@ -11,34 +11,44 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import com.dong.ddrag.modelplatform.model.enums.ModelScenario;
+import com.dong.ddrag.modelplatform.runtime.GovernedChatModel;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationContext;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationDispatcher;
+import com.dong.ddrag.modelplatform.runtime.ModelRuntimeService;
 
 @Service
 public class AssistantMemorySummarizer {
 
-    private final ChatClient chatClient;
     private final PromptTemplate assistantSessionMemoryPromptTemplate;
     private final PromptTemplate assistantCompactSummaryPromptTemplate;
     private final PromptTemplate assistantRuntimeCompactPromptTemplate;
+    private final ModelRuntimeService modelRuntimeService;
+    private final ModelInvocationDispatcher invocationDispatcher;
 
     public AssistantMemorySummarizer(
-            ChatClient.Builder chatClientBuilder,
             @Qualifier("assistantSessionMemoryPromptTemplate") PromptTemplate assistantSessionMemoryPromptTemplate,
             @Qualifier("assistantCompactSummaryPromptTemplate") PromptTemplate assistantCompactSummaryPromptTemplate,
-            @Qualifier("assistantRuntimeCompactPromptTemplate") PromptTemplate assistantRuntimeCompactPromptTemplate
+            @Qualifier("assistantRuntimeCompactPromptTemplate") PromptTemplate assistantRuntimeCompactPromptTemplate,
+            ModelRuntimeService modelRuntimeService,
+            ModelInvocationDispatcher invocationDispatcher
     ) {
-        this.chatClient = chatClientBuilder.build();
         this.assistantSessionMemoryPromptTemplate = assistantSessionMemoryPromptTemplate;
         this.assistantCompactSummaryPromptTemplate = assistantCompactSummaryPromptTemplate;
         this.assistantRuntimeCompactPromptTemplate = assistantRuntimeCompactPromptTemplate;
+        this.modelRuntimeService = modelRuntimeService;
+        this.invocationDispatcher = invocationDispatcher;
     }
 
     public String summarizeSessionMemory(
+            Long userId, Long sessionId,
             String existingSessionMemory,
             List<AssistantMessageEntity> newMessages,
             AssistantToolMode toolMode,
             Long groupId
     ) {
-        return callForText(assistantSessionMemoryPromptTemplate.create(Map.of(
+        return callForText(userId, sessionId, ModelScenario.SESSION_SUMMARY, assistantSessionMemoryPromptTemplate.create(Map.of(
                 "existingSessionMemory", defaultText(existingSessionMemory),
                 "newMessages", formatMessages(newMessages),
                 "currentToolMode", toolMode == null ? "UNKNOWN" : toolMode.name(),
@@ -47,24 +57,25 @@ public class AssistantMemorySummarizer {
     }
 
     public String summarizeCompactSummary(
+            Long userId, Long sessionId,
             String existingCompactSummary,
             String sessionMemory,
             List<AssistantMessageEntity> messagesToCompact
     ) {
-        return callForText(assistantCompactSummaryPromptTemplate.create(Map.of(
+        return callForText(userId, sessionId, ModelScenario.SESSION_SUMMARY, assistantCompactSummaryPromptTemplate.create(Map.of(
                 "existingCompactSummary", defaultText(existingCompactSummary),
                 "sessionMemory", defaultText(sessionMemory),
                 "messagesToCompact", formatMessages(messagesToCompact)
         )), "生成 compact summary 失败");
     }
 
-    public String summarizeRuntimeContext(
+    public String summarizeRuntimeContext(Long userId, Long sessionId,
             String compactSummary,
             String sessionMemory,
             String recentMessages,
             String currentQuestion
     ) {
-        return callForText(assistantRuntimeCompactPromptTemplate.create(Map.of(
+        return callForText(userId, sessionId, ModelScenario.SESSION_SUMMARY, assistantRuntimeCompactPromptTemplate.create(Map.of(
                 "compactSummary", defaultText(compactSummary),
                 "sessionMemory", defaultText(sessionMemory),
                 "recentMessages", defaultText(recentMessages),
@@ -96,9 +107,9 @@ public class AssistantMemorySummarizer {
         return builder.isEmpty() ? "NONE" : builder.toString();
     }
 
-    private String callForText(Prompt prompt, String errorMessage) {
+    private String callForText(Long userId, Long sessionId, ModelScenario scenario, Prompt prompt, String errorMessage) {
         try {
-            String content = chatClient.prompt(prompt)
+            String content = chatClient(userId, sessionId, scenario).prompt(prompt)
                     .call()
                     .content();
             String normalized = normalize(content);
@@ -112,6 +123,12 @@ public class AssistantMemorySummarizer {
             }
             throw new BusinessException(errorMessage, exception);
         }
+    }
+
+    private ChatClient chatClient(Long userId, Long sessionId, ModelScenario scenario) {
+        ModelInvocationContext context = modelRuntimeService.resolveScenario(userId, scenario,
+                new ModelRuntimeService.InvocationCorrelation(UUID.randomUUID().toString(), null, null, null, sessionId));
+        return ChatClient.builder(new GovernedChatModel(context, invocationDispatcher)).build();
     }
 
     private String normalize(String content) {

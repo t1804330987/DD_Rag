@@ -102,24 +102,28 @@ const emit = defineEmits<{
 .group-context-aside {
   display: grid;
   gap: 1rem;
-  padding: 1.1rem;
-  border-radius: 28px;
+  min-width: 0;
+  padding: 1.05rem;
+  border-radius: 0.75rem;
   border: 1px solid rgba(16, 42, 59, 0.08);
   background:
     radial-gradient(circle at top right, rgba(110, 176, 197, 0.18), transparent 16rem),
     linear-gradient(165deg, rgba(252, 254, 255, 0.98), rgba(237, 245, 248, 0.94));
-  box-shadow: 0 24px 64px rgba(13, 40, 58, 0.1);
+  box-shadow: 0 14px 32px rgba(13, 40, 58, 0.07);
+  overflow: visible;
 }
 
 .group-context-aside--inline {
   padding: 1rem;
-  border-radius: 24px;
+  border-radius: 0.7rem;
 }
 
 .group-context-aside__header h2,
 .group-context-aside__section h3 {
   margin: 0;
   color: #102a3b;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .group-context-aside__eyebrow {
@@ -149,10 +153,11 @@ const emit = defineEmits<{
 .group-context-aside__badge,
 .group-context-aside__count {
   flex-shrink: 0;
-  padding: 0.24rem 0.58rem;
-  border-radius: 999px;
+  padding: 0.2rem 0.48rem;
+  border-radius: 0.4rem;
   font-size: 0.74rem;
   font-weight: 700;
+  line-height: 1.25;
 }
 
 .group-context-aside.is-owner .group-context-aside__badge {

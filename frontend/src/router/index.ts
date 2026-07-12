@@ -50,6 +50,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/ai-settings',
+    name: 'ai-settings',
+    component: () => import('../pages/ai-settings/AiSettingsPage.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/admin',
     component: () => import('../pages/admin/AdminLayout.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
@@ -72,6 +78,11 @@ const routes: RouteRecordRaw[] = [
         path: 'users/:userId',
         name: 'admin-user-detail',
         component: () => import('../pages/admin/users/AdminUserDetailPage.vue'),
+      },
+      {
+        path: 'model-governance',
+        name: 'admin-model-governance',
+        component: () => import('../pages/admin/AdminModelGovernancePage.vue'),
       },
     ],
   },

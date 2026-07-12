@@ -37,6 +37,12 @@
         )
     </insert>
 
+    <select id="selectById" resultMap="assistantMessageEntityMap">
+        select id, session_id, role, tool_mode, group_id, content, structured_payload, created_at
+        from assistant_messages
+        where id = #{messageId}
+    </select>
+
     <select id="countBySessionId" resultType="java.lang.Long">
         select count(1)
         from assistant_messages

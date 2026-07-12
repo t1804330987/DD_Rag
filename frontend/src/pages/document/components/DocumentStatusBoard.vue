@@ -28,8 +28,8 @@ defineProps<{
       <article class="document-status-board__panel">
         <div class="document-status-board__panel-header">
           <div>
-            <p class="panel__eyebrow">Matches</p>
-            <h2>当前筛选命中</h2>
+            <p class="panel__eyebrow">筛选</p>
+            <h2>当前命中</h2>
           </div>
           <strong class="document-status-board__highlight">{{ matchedCount }}</strong>
         </div>
@@ -39,8 +39,8 @@ defineProps<{
       <article class="document-status-board__panel">
         <div class="document-status-board__panel-header">
           <div>
-            <p class="panel__eyebrow">Recent Failures</p>
-            <h2>最近异常</h2>
+            <p class="panel__eyebrow">异常</p>
+            <h2>最近失败</h2>
           </div>
         </div>
 
@@ -51,7 +51,7 @@ defineProps<{
             <small>{{ item.uploadedAt }}</small>
           </li>
         </ul>
-        <p v-else class="document-status-board__summary-text">当前筛选结果里没有新的失败文件。</p>
+        <p v-else class="document-status-board__summary-text">当前筛选结果中没有失败文件。</p>
       </article>
     </div>
   </section>

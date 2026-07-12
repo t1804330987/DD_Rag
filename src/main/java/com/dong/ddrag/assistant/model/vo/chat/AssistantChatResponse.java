@@ -11,6 +11,18 @@ public record AssistantChatResponse(
         String reply,
         AssistantToolMode toolMode,
         Long groupId,
-        List<AskQuestionResponse.Citation> citations
+        List<AskQuestionResponse.Citation> citations,
+        String turnId,
+        String status
 ) {
+    public AssistantChatResponse(
+            Long sessionId,
+            Long messageId,
+            String reply,
+            AssistantToolMode toolMode,
+            Long groupId,
+            List<AskQuestionResponse.Citation> citations
+    ) {
+        this(sessionId, messageId, reply, toolMode, groupId, citations, null, "COMPLETED");
+    }
 }

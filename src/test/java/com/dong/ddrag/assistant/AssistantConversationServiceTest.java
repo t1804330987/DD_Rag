@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 @ExtendWith(MockitoExtension.class)
 class AssistantConversationServiceTest {
 
@@ -117,6 +118,37 @@ class AssistantConversationServiceTest {
         assertThat(persisted.getToolMode()).isEqualTo(AssistantToolMode.KB_SEARCH.name());
         assertThat(persisted.getGroupId()).isEqualTo(9002L);
         assertThat(message.groupId()).isEqualTo(9002L);
+    }
+
+    @Test
+    void shouldKeepAssistantMessageSavedWhenShortTermMemoryMaintenanceFails() {
+        AssistantConversationService service = createService();
+        given(assistantSessionMapper.selectByIdAndUserId(2001L, 1001L)).willReturn(buildSession(2001L, 1001L));
+        given(assistantSessionMapper.updateLastMessageAt(any(), any(), any())).willReturn(1);
+        given(assistantMessageMapper.insert(any(AssistantMessageEntity.class))).willAnswer(invocation -> {
+            AssistantMessageEntity entity = invocation.getArgument(0);
+            entity.setId(3002L);
+            return 1;
+        });
+        willThrow(new BusinessException("MODEL_NOT_CONFIGURED"))
+                .given(assistantShortTermMemoryMaintenanceService)
+                .maintainAfterResponse(1001L, 2001L, AssistantToolMode.CHAT, null, 3002L);
+
+        AssistantMessageVO message = service.saveAssistantMessage(
+                1001L,
+                new AssistantMessageCreateDTO(
+                        2001L,
+                        AssistantToolMode.CHAT,
+                        null,
+                        "这里是助手回答",
+                        null
+                )
+        );
+
+        assertThat(message.messageId()).isEqualTo(3002L);
+        assertThat(message.content()).isEqualTo("这里是助手回答");
+        then(assistantShortTermMemoryMaintenanceService).should()
+                .maintainAfterResponse(1001L, 2001L, AssistantToolMode.CHAT, null, 3002L);
     }
 
     @Test

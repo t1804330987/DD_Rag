@@ -17,23 +17,22 @@ public class AssistantReactAgentFactory {
     // 递归上限过小会导致图在最终回答前被截断，返回空 AssistantMessage。
     private static final int AGENT_RECURSION_LIMIT = 10;
 
-    private final ChatModel chatModel;
     private final AssistantShortTermMemoryHook assistantShortTermMemoryHook;
     private final AssistantKnowledgeBaseTool assistantKnowledgeBaseTool;
 
     public AssistantReactAgentFactory(
-            ChatModel chatModel,
             AssistantShortTermMemoryHook assistantShortTermMemoryHook,
             AssistantKnowledgeBaseTool assistantKnowledgeBaseTool
     ) {
-        this.chatModel = chatModel;
         this.assistantShortTermMemoryHook = assistantShortTermMemoryHook;
         this.assistantKnowledgeBaseTool = assistantKnowledgeBaseTool;
     }
 
     public ReactAgent createAgent(
+            ChatModel chatModel,
             String instruction,
             AssistantToolMode toolMode,
+            Long userId,
             Long groupId,
             AssistantKnowledgeBaseToolResultHolder resultHolder
     ) {
@@ -53,6 +52,7 @@ public class AssistantReactAgentFactory {
             builder.methodTools(assistantKnowledgeBaseTool)
                     .toolContext(Map.of(
                             AssistantKnowledgeBaseTool.GROUP_ID_CONTEXT_KEY, groupId,
+                            AssistantKnowledgeBaseTool.USER_ID_CONTEXT_KEY, userId,
                             AssistantKnowledgeBaseTool.RESULT_HOLDER_CONTEXT_KEY, resultHolder
                     ));
         }

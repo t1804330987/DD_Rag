@@ -14,29 +14,29 @@ withDefaults(defineProps<{
 <template>
   <section class="document-context-aside" :class="`document-context-aside--${variant}`">
     <section class="document-context-aside__section">
-      <p class="panel__eyebrow">Workspace</p>
-      <h2>当前知识库</h2>
+      <p class="panel__eyebrow">知识库</p>
+      <h2>当前范围</h2>
       <strong>{{ workspaceName }}</strong>
       <p>{{ workspaceMeta }}</p>
     </section>
 
     <section class="document-context-aside__section">
-      <p class="panel__eyebrow">Role</p>
-      <h2>当前角色</h2>
+      <p class="panel__eyebrow">角色</p>
+      <h2>当前身份</h2>
       <div class="document-context-aside__badge">{{ relationLabel }}</div>
     </section>
 
     <section class="document-context-aside__section">
-      <p class="panel__eyebrow">Actions</p>
-      <h2>当前页可执行动作</h2>
+      <p class="panel__eyebrow">动作</p>
+      <h2>本页可执行</h2>
       <ul class="document-context-aside__list">
         <li v-for="item in availableActions" :key="item">{{ item }}</li>
       </ul>
     </section>
 
     <section class="document-context-aside__section">
-      <p class="panel__eyebrow">Filters</p>
-      <h2>当前筛选上下文</h2>
+      <p class="panel__eyebrow">筛选</p>
+      <h2>当前条件</h2>
       <ul class="document-context-aside__list">
         <li v-for="item in filterContext" :key="item">{{ item }}</li>
       </ul>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dong.ddrag.modelplatform.mapper.AssistantInstructionProfileMapper">
+    <resultMap id="map" type="com.dong.ddrag.modelplatform.model.entity.AssistantInstructionProfileEntity"><id property="id" column="id"/><result property="userId" column="user_id"/><result property="name" column="name"/><result property="currentVersionId" column="current_version_id"/><result property="enabled" column="enabled"/><result property="isDefault" column="is_default"/><result property="deletedAt" column="deleted_at"/><result property="createdAt" column="created_at"/><result property="updatedAt" column="updated_at"/></resultMap>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">insert into assistant_instruction_profiles(user_id, name, current_version_id, enabled, is_default, deleted_at, created_at, updated_at) values(#{userId}, #{name}, #{currentVersionId}, #{enabled}, #{isDefault}, #{deletedAt}, #{createdAt}, #{updatedAt})</insert>
+    <select id="selectEnabledByUserId" resultMap="map">select * from assistant_instruction_profiles where user_id=#{userId} and enabled and deleted_at is null order by is_default desc, id</select>
+    <select id="selectAllByUserId" resultMap="map">select * from assistant_instruction_profiles where user_id=#{userId} and deleted_at is null order by is_default desc, id</select>
+    <select id="selectByIdAndUserId" resultMap="map">select * from assistant_instruction_profiles where id=#{profileId} and user_id=#{userId} and deleted_at is null</select>
+    <select id="selectDefaultEnabledByUserId" resultMap="map">select * from assistant_instruction_profiles where user_id=#{userId} and enabled and is_default and deleted_at is null limit 1</select>
+    <update id="updateCurrentVersion">update assistant_instruction_profiles set current_version_id=#{versionId}, updated_at=#{updatedAt} where id=#{profileId} and user_id=#{userId} and deleted_at is null</update>
+    <update id="updateName">update assistant_instruction_profiles set name=#{name}, updated_at=#{updatedAt} where id=#{profileId} and user_id=#{userId} and deleted_at is null</update>
+    <update id="clearDefaultByUserId">update assistant_instruction_profiles set is_default=false, updated_at=#{updatedAt} where user_id=#{userId} and is_default and deleted_at is null</update>
+    <update id="setDefault">update assistant_instruction_profiles set is_default=true, enabled=true, updated_at=#{updatedAt} where id=#{profileId} and user_id=#{userId} and deleted_at is null</update>
+    <update id="setEnabled">update assistant_instruction_profiles set enabled=#{enabled}, is_default=case when #{enabled} then is_default else false end, updated_at=#{updatedAt} where id=#{profileId} and user_id=#{userId} and deleted_at is null</update>
+    <update id="softDeleteByIdAndUserId">update assistant_instruction_profiles set enabled=false, is_default=false, deleted_at=#{deletedAt}, updated_at=#{deletedAt} where id=#{profileId} and user_id=#{userId} and deleted_at is null</update>
+</mapper>

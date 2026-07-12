@@ -34,6 +34,13 @@ This Harness protects the Assistant business flow. It does not test UI rendering
 - Confirmation-question turns must emit the confirmation answer and must not call the Agent.
 - The saved assistant message must match the final stream result.
 
+### V6.1 Model Platform Compatibility
+
+- Model selection and personal-instruction resolution apply only to subsequent Assistant turns and must not bypass runtime-memory processing or `KB_SEARCH` Tool rules.
+- A session turn remains mutually exclusive even when it resolves a governed model at runtime.
+- Each physical model invocation is ledgered by the governed runtime; the ledger must not store the complete prompt or reply.
+- Model admission or cancellation failures must not turn a confirmation-only memory turn into an Agent invocation.
+
 ## Positive Cases
 
 - Normal chat saves user message, calls Agent once, saves assistant reply, and returns the reply.

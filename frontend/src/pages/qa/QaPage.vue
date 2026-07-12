@@ -39,24 +39,24 @@ const availableGroupCount = computed(() => ownedGroups.value.length + joinedGrou
 const currentContextKey = computed(() => `${authStore.currentUser?.userId ?? 'anonymous'}:${currentGroupId.value ?? 'none'}`)
 const currentGroupDescription = computed(() => {
   if (currentGroup.value === null) {
-    return '先锁定一个知识库空间，再开始组内检索式问答。'
+    return '先选择知识库，再提问。回答只会用该组文档中的证据。'
   }
   return currentGroup.value.relation === 'OWNER'
-    ? `当前在 OWNER 空间「${currentGroup.value.groupName}」内问答，回答仅使用该组的有效证据。`
-    : `当前在 MEMBER 空间「${currentGroup.value.groupName}」内问答，回答范围同样只限制在该组。`
+    ? `知识库「${currentGroup.value.groupName}」（所有者）。回答仅基于本组文档。`
+    : `知识库「${currentGroup.value.groupName}」（成员）。回答仅基于本组文档。`
 })
 const currentRoleHint = computed(() => {
   if (currentGroup.value === null) {
-    return 'OWNER 与 MEMBER 都可以问答，但必须先进入一个当前可见组。'
+    return '所有者与成员都可提问，但必须先选中一个组。'
   }
   return currentGroup.value.relation === 'OWNER'
-    ? '你当前拥有该组，可继续在文件页执行上传、删除与重建，在此页聚焦问答。'
-    : '你当前是 MEMBER，可查看内容并问答，但不能上传文件或管理成员。'
+    ? '你是所有者：可在文档页管理文件，在此页专注问答。'
+    : '你是成员：可查看与问答，不能上传或管理成员。'
 })
 const pageHeroDescription = computed(() =>
   currentGroup.value === null
-    ? '先选择一个知识库空间，再围绕该组完成提问、回答和证据核对。'
-    : `当前聚焦「${currentGroup.value.groupName}」，所有回答都严格约束在该知识库的检索结果内。`,
+    ? '单轮知识问答：选组 → 提问 → 查看回答与证据。'
+    : `当前知识库：${currentGroup.value.groupName}。回答严格限定在该组检索结果内。`,
 )
 
 watch(
@@ -150,23 +150,23 @@ function isActiveAskRequest(contextVersion: number, contextKey: string, requestI
 
     <template #main>
       <main class="qa-page">
-        <PageHeaderHero eyebrow="Answer Studio" title="问答工作台" :description="pageHeroDescription">
+        <PageHeaderHero eyebrow="问答" title="知识问答" :description="pageHeroDescription">
           <template #actions>
             <div class="qa-page__hero-actions">
               <div class="qa-page__hero-context">
-                <span>当前空间</span>
-                <strong>{{ currentGroup?.groupName ?? '等待选择知识库' }}</strong>
+                <span>知识库</span>
+                <strong>{{ currentGroup?.groupName ?? '未选择' }}</strong>
               </div>
               <div class="qa-page__hero-context">
-                <span>当前角色</span>
+                <span>角色</span>
                 <strong>{{ currentRoleLabel }}</strong>
               </div>
               <div class="qa-page__hero-context">
-                <span>可见组数</span>
+                <span>可见组</span>
                 <strong>{{ availableGroupCount }}</strong>
               </div>
               <div class="qa-page__hero-context">
-                <span>待处理邀请</span>
+                <span>邀请</span>
                 <strong>{{ pendingInvitationCount }}</strong>
               </div>
             </div>

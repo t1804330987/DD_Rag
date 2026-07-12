@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dong.ddrag.modelplatform.mapper.ModelCallLedgerMapper">
+    <resultMap id="map" type="com.dong.ddrag.modelplatform.model.entity.ModelCallLedgerEntity">
+        <id property="id" column="id"/><result property="invocationId" column="invocation_id"/><result property="userId" column="user_id"/><result property="scenario" column="scenario"/><result property="sessionId" column="session_id"/><result property="userMessageId" column="user_message_id"/><result property="assistantMessageId" column="assistant_message_id"/><result property="turnId" column="turn_id"/><result property="requestId" column="request_id"/><result property="connectionId" column="connection_id"/><result property="modelId" column="model_id"/><result property="providerTypeSnapshot" column="provider_type_snapshot"/><result property="modelNameSnapshot" column="model_name_snapshot"/><result property="connectionNameSnapshot" column="connection_name_snapshot"/><result property="ownerTypeSnapshot" column="owner_type_snapshot"/><result property="instructionProfileId" column="instruction_profile_id"/><result property="instructionVersionId" column="instruction_version_id"/><result property="instructionVersionSnapshot" column="instruction_version_snapshot"/><result property="inputTokens" column="input_tokens"/><result property="outputTokens" column="output_tokens"/><result property="totalTokens" column="total_tokens"/><result property="durationMs" column="duration_ms"/><result property="logicalStatus" column="logical_status"/><result property="transportStatus" column="transport_status"/><result property="errorCategory" column="error_category"/><result property="errorSummary" column="error_summary"/><result property="startedAt" column="started_at"/><result property="finishedAt" column="finished_at"/><result property="createdAt" column="created_at"/><result property="updatedAt" column="updated_at"/>
+    </resultMap>
+    <sql id="columns">id, invocation_id, user_id, scenario, session_id, user_message_id, assistant_message_id, turn_id, request_id, connection_id, model_id, provider_type_snapshot, model_name_snapshot, connection_name_snapshot, owner_type_snapshot, instruction_profile_id, instruction_version_id, instruction_version_snapshot, input_tokens, output_tokens, total_tokens, duration_ms, logical_status, transport_status, error_category, error_summary, started_at, finished_at, created_at, updated_at</sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">insert into model_call_ledger(invocation_id,user_id,scenario,session_id,user_message_id,assistant_message_id,turn_id,request_id,connection_id,model_id,provider_type_snapshot,model_name_snapshot,connection_name_snapshot,owner_type_snapshot,instruction_profile_id,instruction_version_id,instruction_version_snapshot,input_tokens,output_tokens,total_tokens,duration_ms,logical_status,transport_status,error_category,error_summary,started_at,finished_at,created_at,updated_at) values(#{invocationId},#{userId},#{scenario},#{sessionId},#{userMessageId},#{assistantMessageId},#{turnId},#{requestId},#{connectionId},#{modelId},#{providerTypeSnapshot},#{modelNameSnapshot},#{connectionNameSnapshot},#{ownerTypeSnapshot},#{instructionProfileId},#{instructionVersionId},#{instructionVersionSnapshot},#{inputTokens},#{outputTokens},#{totalTokens},#{durationMs},#{logicalStatus},#{transportStatus},#{errorCategory},#{errorSummary},#{startedAt},#{finishedAt},#{createdAt},#{updatedAt}) on conflict (invocation_id) do nothing</insert>
+    <select id="selectByInvocationId" resultMap="map">select <include refid="columns"/> from model_call_ledger where invocation_id=#{invocationId}</select>
+    <update id="completeIfRunning">
+        update model_call_ledger set logical_status=#{logicalStatus}, transport_status=#{transportStatus},
+        input_tokens=#{inputTokens}, output_tokens=#{outputTokens}, total_tokens=#{totalTokens},
+        duration_ms=#{durationMs}, assistant_message_id=coalesce(#{assistantMessageId}, assistant_message_id),
+        error_category=#{errorCategory}, error_summary=#{errorSummary}, finished_at=current_timestamp,
+        updated_at=current_timestamp
+        where invocation_id=#{invocationId} and logical_status='RUNNING' and transport_status='ACTIVE'
+    </update>
+    <update id="requestCancellationIfRunning">
+        update model_call_ledger set logical_status='CANCEL_REQUESTED', transport_status='DETACHED',
+        duration_ms=#{durationMs}, updated_at=#{updatedAt}
+        where invocation_id=#{invocationId} and logical_status='RUNNING' and transport_status='ACTIVE'
+    </update>
+    <update id="detachBusinessTimeoutIfRunning">
+        update model_call_ledger set logical_status='TIMEOUT', transport_status='DETACHED',
+        duration_ms=#{durationMs}, error_category=#{errorCategory}, updated_at=#{updatedAt}
+        where invocation_id=#{invocationId} and logical_status='RUNNING' and transport_status='ACTIVE'
+    </update>
+    <update id="terminateBusinessTimeout">
+        update model_call_ledger set logical_status='TIMEOUT', transport_status='TERMINATED',
+        duration_ms=#{durationMs}, finished_at=#{finishedAt}, updated_at=#{finishedAt}
+        where invocation_id=#{invocationId} and logical_status='TIMEOUT' and transport_status='DETACHED'
+    </update>
+    <update id="terminateCancellation">
+        update model_call_ledger set logical_status='CANCELLED', transport_status='TERMINATED',
+        duration_ms=#{durationMs}, finished_at=#{finishedAt}, updated_at=#{finishedAt}
+        where invocation_id=#{invocationId}
+          and logical_status in ('RUNNING','CANCEL_REQUESTED')
+          and transport_status in ('ACTIVE','DETACHED')
+    </update>
+    <select id="selectStaleCandidates" resultMap="map">
+        select <include refid="columns"/> from model_call_ledger
+        where started_at&lt;=#{cutoff}
+          and ((logical_status='RUNNING' and transport_status='ACTIVE')
+            or (logical_status in ('CANCEL_REQUESTED','TIMEOUT') and transport_status='DETACHED'))
+        order by started_at, id
+    </select>
+    <update id="hardTimeoutIfUnfinished">
+        update model_call_ledger set logical_status='TIMEOUT', transport_status='HARD_TIMEOUT',
+        duration_ms=#{durationMs}, error_category=#{errorCategory},
+        error_summary='Invocation exceeded transport hard timeout', finished_at=#{finishedAt}, updated_at=#{finishedAt}
+        where invocation_id=#{invocationId}
+          and ((logical_status='RUNNING' and transport_status='ACTIVE')
+            or (logical_status in ('CANCEL_REQUESTED','TIMEOUT') and transport_status='DETACHED'))
+    </update>
+    <select id="selectByUserAndStartedAtBetween" resultMap="map">select <include refid="columns"/> from model_call_ledger where user_id=#{userId} and started_at&gt;=#{startedAt} and started_at&lt;#{endedAt} order by started_at desc, id desc</select>
+    <select id="selectForAdminUsage" resultMap="map">
+        select <include refid="columns"/> from model_call_ledger
+        where started_at&gt;=#{startedAt} and started_at&lt;#{endedAt}
+        <if test="userId != null">and user_id=#{userId}</if>
+        <if test="providerType != null">and provider_type_snapshot=#{providerType}</if>
+        <if test="modelName != null">and model_name_snapshot=#{modelName}</if>
+        <if test="scenario != null">and scenario=#{scenario}</if>
+        <if test="logicalStatus != null">and logical_status=#{logicalStatus}</if>
+        order by started_at desc, id desc
+    </select>
+    <select id="aggregateUsage" resultType="com.dong.ddrag.modelplatform.mapper.ModelCallLedgerMapper$UsageAggregateRow">
+        select provider_type_snapshot as provider_type, model_name_snapshot as model_name, scenario,
+               logical_status, transport_status, count(*) as invocation_count,
+               coalesce(sum(input_tokens),0) as input_tokens,
+               coalesce(sum(output_tokens),0) as output_tokens,
+               coalesce(sum(total_tokens),0) as total_tokens,
+               coalesce(sum(duration_ms),0) as duration_ms
+        from model_call_ledger
+        where started_at&gt;=#{startedAt} and started_at&lt;#{endedAt}
+        <if test="userId != null">and user_id=#{userId}</if>
+        <if test="providerType != null">and provider_type_snapshot=#{providerType}</if>
+        <if test="modelName != null">and model_name_snapshot=#{modelName}</if>
+        <if test="scenario != null">and scenario=#{scenario}</if>
+        <if test="logicalStatus != null">and logical_status=#{logicalStatus}</if>
+        <if test="transportStatus != null">and transport_status=#{transportStatus}</if>
+        group by provider_type_snapshot, model_name_snapshot, scenario, logical_status, transport_status
+        order by provider_type_snapshot, model_name_snapshot, scenario, logical_status, transport_status
+    </select>
+</mapper>

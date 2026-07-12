@@ -11,6 +11,12 @@ import com.dong.ddrag.assistant.model.vo.chat.AssistantAgentResult;
 import com.dong.ddrag.assistant.support.config.AssistantPromptContextBuilder;
 import com.dong.ddrag.assistant.support.config.AssistantRunnableConfigFactory;
 import com.dong.ddrag.common.exception.BusinessException;
+import com.dong.ddrag.modelplatform.runtime.GovernedChatModel;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationContext;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationDispatcher;
+import com.dong.ddrag.modelplatform.runtime.ModelCallCancellation;
+import com.dong.ddrag.modelplatform.runtime.ModelRuntimeService;
+import com.dong.ddrag.modelplatform.service.AssistantInstructionProfileService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -19,6 +25,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 import java.util.function.Consumer;
+import java.util.UUID;
 
 @Component
 public class AssistantAgentFacade {
@@ -28,15 +35,24 @@ public class AssistantAgentFacade {
     private final AssistantReactAgentFactory assistantReactAgentFactory;
     private final AssistantRunnableConfigFactory assistantRunnableConfigFactory;
     private final AssistantPromptContextBuilder assistantPromptContextBuilder;
+    private final ModelRuntimeService modelRuntimeService;
+    private final ModelInvocationDispatcher modelInvocationDispatcher;
+    private final AssistantInstructionProfileService instructionProfileService;
 
     public AssistantAgentFacade(
             AssistantReactAgentFactory assistantReactAgentFactory,
             AssistantRunnableConfigFactory assistantRunnableConfigFactory,
-            AssistantPromptContextBuilder assistantPromptContextBuilder
+            AssistantPromptContextBuilder assistantPromptContextBuilder,
+            ModelRuntimeService modelRuntimeService,
+            ModelInvocationDispatcher modelInvocationDispatcher,
+            AssistantInstructionProfileService instructionProfileService
     ) {
         this.assistantReactAgentFactory = assistantReactAgentFactory;
         this.assistantRunnableConfigFactory = assistantRunnableConfigFactory;
         this.assistantPromptContextBuilder = assistantPromptContextBuilder;
+        this.modelRuntimeService = modelRuntimeService;
+        this.modelInvocationDispatcher = modelInvocationDispatcher;
+        this.instructionProfileService = instructionProfileService;
     }
 
     public AssistantAgentResult chat(
@@ -46,14 +62,32 @@ public class AssistantAgentFacade {
             Long groupId,
             String userMessage
     ) {
+        return chat(userId, sessionId, toolMode, groupId, userMessage, null, null, null);
+    }
+
+    public AssistantAgentResult chat(
+            Long userId,
+            Long sessionId,
+            AssistantToolMode toolMode,
+            Long groupId,
+            String userMessage,
+            String turnId,
+            String requestId,
+            Long userMessageId
+    ) {
         // 这里把“仅对话模式”的运行时输入收口成两部分：
         // 1) instruction：系统提示词
         // 2) runnableConfig：session/user/toolMode 等 metadata，供 hooks 在 BEFORE_MODEL 阶段读取
+        ResolvedAgentContext context = resolveContext(userId, sessionId,
+                new ModelRuntimeService.InvocationCorrelation(
+                        turnId == null ? UUID.randomUUID().toString() : turnId, requestId, userMessageId, null, sessionId
+                ), null);
         String instruction = assistantPromptContextBuilder.buildChatInstruction(
                 userId,
                 sessionId,
                 toolMode,
-                groupId
+                groupId,
+                context.instruction().content()
         );
         RunnableConfig runnableConfig = assistantRunnableConfigFactory.create(
                 userId,
@@ -63,7 +97,7 @@ public class AssistantAgentFacade {
         );
         // 当前虽然是“仅对话模式”，底层仍然使用 ReactAgent，只是 system prompt 已改成纯对话风格。
         AssistantKnowledgeBaseToolResultHolder resultHolder = new AssistantKnowledgeBaseToolResultHolder();
-        ReactAgent agent = assistantReactAgentFactory.createAgent(instruction, toolMode, groupId, resultHolder);
+        ReactAgent agent = assistantReactAgentFactory.createAgent(context.chatModel(), instruction, toolMode, userId, groupId, resultHolder);
         AssistantMessage assistantMessage;
         try {
             assistantMessage = agent.call(userMessage, runnableConfig);
@@ -96,11 +130,43 @@ public class AssistantAgentFacade {
             String userMessage,
             Consumer<String> deltaConsumer
     ) {
+        return streamChat(userId, sessionId, toolMode, groupId, userMessage, deltaConsumer, new ModelCallCancellation(), null, null, null);
+    }
+
+    public AssistantAgentResult streamChat(
+            Long userId,
+            Long sessionId,
+            AssistantToolMode toolMode,
+            Long groupId,
+            String userMessage,
+            Consumer<String> deltaConsumer,
+            ModelCallCancellation cancellation
+    ) {
+        return streamChat(userId, sessionId, toolMode, groupId, userMessage, deltaConsumer, cancellation, null, null, null);
+    }
+
+    public AssistantAgentResult streamChat(
+            Long userId,
+            Long sessionId,
+            AssistantToolMode toolMode,
+            Long groupId,
+            String userMessage,
+            Consumer<String> deltaConsumer,
+            ModelCallCancellation cancellation,
+            String turnId,
+            String requestId,
+            Long userMessageId
+    ) {
+        ResolvedAgentContext context = resolveContext(userId, sessionId,
+                new ModelRuntimeService.InvocationCorrelation(
+                        turnId == null ? UUID.randomUUID().toString() : turnId, requestId, userMessageId, null, sessionId
+                ), cancellation);
         String instruction = assistantPromptContextBuilder.buildChatInstruction(
                 userId,
                 sessionId,
                 toolMode,
-                groupId
+                groupId,
+                context.instruction().content()
         );
         RunnableConfig runnableConfig = assistantRunnableConfigFactory.create(
                 userId,
@@ -109,13 +175,20 @@ public class AssistantAgentFacade {
                 groupId
         );
         AssistantKnowledgeBaseToolResultHolder resultHolder = new AssistantKnowledgeBaseToolResultHolder();
-        ReactAgent agent = assistantReactAgentFactory.createAgent(instruction, toolMode, groupId, resultHolder);
+        ReactAgent agent = assistantReactAgentFactory.createAgent(context.chatModel(), instruction, toolMode, userId, groupId, resultHolder);
         StringBuilder finalReply = new StringBuilder();
         try {
             // stream() 返回的是图执行过程中的节点输出，这里只抽取模型实际产出的文本 delta。
             Flux<NodeOutput> stream = agent.stream(userMessage, runnableConfig);
-            stream.doOnNext(output -> handleStreamingOutput(output, deltaConsumer, finalReply))
-                    .blockLast();
+            cancellation.bind(() -> stream
+                    .doOnNext(output -> {
+                        if (!cancellation.isRequested()) {
+                            handleStreamingOutput(output, deltaConsumer, finalReply);
+                        }
+                    })
+                    .blockLast());
+        } catch (BusinessException exception) {
+            throw exception;
         } catch (GraphRunnerException exception) {
             throw new BusinessException("助手调用失败", exception);
         }
@@ -130,6 +203,9 @@ public class AssistantAgentFacade {
                     abbreviate(reply),
                     resultHolder.currentCitations().size()
             );
+        }
+        if (cancellation.isRequested()) {
+            throw new BusinessException(cancellation.isHardTimedOut() ? "CALL_TIMEOUT" : "CALL_CANCELLED");
         }
         if (reply.isBlank()) {
             throw new BusinessException("助手返回内容为空");
@@ -198,4 +274,32 @@ public class AssistantAgentFacade {
         }
         return normalized;
     }
+
+    private ResolvedAgentContext resolveContext(Long userId, Long sessionId) {
+        return resolveContext(userId, sessionId, null, null);
+    }
+
+    private ResolvedAgentContext resolveContext(Long userId, Long sessionId, ModelCallCancellation cancellation) {
+        return resolveContext(userId, sessionId, null, cancellation);
+    }
+
+    private ResolvedAgentContext resolveContext(
+            Long userId,
+            Long sessionId,
+            ModelRuntimeService.InvocationCorrelation correlation,
+            ModelCallCancellation cancellation
+    ) {
+        if (correlation == null) {
+            correlation = new ModelRuntimeService.InvocationCorrelation(UUID.randomUUID().toString(), null, null, null, sessionId);
+        }
+        ModelInvocationContext modelContext = modelRuntimeService.resolveAssistant(userId, sessionId, correlation);
+        AssistantInstructionProfileService.ResolvedInstruction instruction =
+                instructionProfileService.resolveCurrentForSession(userId, sessionId);
+        ModelInvocationContext governedContext = modelContext.withInstruction(new ModelInvocationContext.InstructionSnapshot(
+                instruction.profileId(), instruction.versionId(), instruction.version()));
+        return new ResolvedAgentContext(new GovernedChatModel(governedContext, modelInvocationDispatcher, cancellation), instruction);
+    }
+
+    private record ResolvedAgentContext(GovernedChatModel chatModel,
+                                        AssistantInstructionProfileService.ResolvedInstruction instruction) { }
 }

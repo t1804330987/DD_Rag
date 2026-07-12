@@ -117,8 +117,8 @@ const totalPendingCount = computed(
 const currentUserIdLabel = computed(() => authStore.currentUser?.userId?.toString() ?? '--')
 const pageHeroDescription = computed(() =>
   shouldShowOnboarding.value
-    ? '首页先回答“当前在哪”和“下一步做什么”，再进入具体知识库动作。'
-    : '左侧选择组对象，中间直接进入组详情与成员动作，不再展示额外上下文栏。',
+    ? '先创建或加入一个组，再上传文档、发起问答。左侧是组列表，中间处理详情。'
+    : '在左侧切换组，中间管理成员、邀请与申请。',
 )
 
 watch(
@@ -488,7 +488,7 @@ async function handleLeaveGroup(groupId: number) {
 
     <template #main>
       <main class="groups-page">
-        <PageHeaderHero eyebrow="协作小组" title="我的组" :description="pageHeroDescription">
+        <PageHeaderHero eyebrow="协作" title="我的组" :description="pageHeroDescription">
           <template #actions>
             <div class="groups-page__hero-actions">
               <div class="groups-page__identity">

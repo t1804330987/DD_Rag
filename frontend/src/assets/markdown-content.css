@@ -1,0 +1,320 @@
+.md-content-shell {
+  min-width: 0;
+}
+
+.md-content-shell--with-toolbar {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.md-content-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.md-content-toolbar__btn,
+.md-code-block__copy {
+  border: 1px solid rgba(98, 128, 158, 0.18);
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.92);
+  color: #35566f;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.md-content-toolbar__btn {
+  min-height: 1.7rem;
+  padding: 0.28rem 0.58rem;
+}
+
+.md-content-toolbar__btn:hover:not(:disabled),
+.md-code-block__copy:hover {
+  border-color: rgba(47, 107, 149, 0.28);
+  background: rgba(239, 246, 251, 0.96);
+  color: #1f4f73;
+}
+
+.md-content-toolbar__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.md-code-block {
+  position: relative;
+  margin: 0.75em 0;
+}
+
+.md-code-block pre {
+  margin: 0;
+}
+
+.md-code-block__copy {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  min-height: 1.55rem;
+  padding: 0.22rem 0.5rem;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #e8f1f8;
+}
+
+.md-code-block__copy:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+
+.md-content {
+  color: #1f3348;
+  font-size: 0.95rem;
+  line-height: 1.72;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.md-content--plain {
+  white-space: pre-wrap;
+}
+
+.md-content > :first-child {
+  margin-top: 0;
+}
+
+.md-content > :last-child {
+  margin-bottom: 0;
+}
+
+.md-content p {
+  margin: 0 0 0.72em;
+}
+
+.md-content h1,
+.md-content h2,
+.md-content h3,
+.md-content h4,
+.md-content h5,
+.md-content h6 {
+  display: block;
+  margin: 1.1em 0 0.45em;
+  color: #102a40;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.md-content h1 {
+  font-size: 1.32rem;
+  padding: 0.15em 0 0.3em;
+  border-bottom: 1px solid rgba(98, 128, 158, 0.18);
+}
+
+.md-content h2 {
+  font-size: 1.16rem;
+  padding: 0.1em 0 0.22em;
+  border-bottom: 1px solid rgba(98, 128, 158, 0.12);
+}
+
+.md-content h3 {
+  font-size: 1.06rem;
+  color: #16324a;
+  padding-left: 0.55rem;
+  border-left: 3px solid rgba(42, 103, 147, 0.45);
+}
+
+.md-content h4 {
+  font-size: 1.02rem;
+}
+
+.md-content h5,
+.md-content h6 {
+  font-size: 0.98rem;
+  color: #2a4258;
+}
+
+.md-content h1 + p,
+.md-content h2 + p,
+.md-content h3 + p,
+.md-content h4 + p {
+  margin-top: 0.2em;
+}
+
+.md-content ul,
+.md-content ol {
+  margin: 0.4em 0 0.85em;
+  padding-left: 1.4em;
+}
+
+.md-content li {
+  margin: 0.28em 0;
+  line-height: 1.65;
+}
+
+.md-content li > ul,
+.md-content li > ol {
+  margin: 0.2em 0;
+}
+
+.md-content blockquote {
+  margin: 0.7em 0;
+  padding: 0.5em 0.9em;
+  border-left: 3px solid rgba(47, 107, 149, 0.42);
+  border-radius: 0 0.5rem 0.5rem 0;
+  background: rgba(47, 107, 149, 0.06);
+  color: #3d556c;
+}
+
+.md-content blockquote p {
+  margin: 0.35em 0;
+}
+
+.md-content hr {
+  margin: 1em 0;
+  border: 0;
+  border-top: 1px solid rgba(98, 128, 158, 0.22);
+}
+
+.md-content a {
+  color: #2563a8;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.md-content a:hover {
+  color: #1a4f87;
+}
+
+.md-content strong {
+  color: #102a40;
+  font-weight: 700;
+}
+
+.md-content em {
+  color: #2b4258;
+}
+
+.md-content code {
+  font-family: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', 'SFMono-Regular', monospace;
+  font-size: 0.88em;
+  padding: 0.12em 0.38em;
+  border-radius: 0.35rem;
+  background: rgba(15, 43, 70, 0.07);
+  color: #1b3d5c;
+  border: 1px solid rgba(98, 128, 158, 0.14);
+}
+
+.md-content pre {
+  margin: 0.75em 0;
+  padding: 0.85rem 0.95rem;
+  overflow-x: auto;
+  border-radius: 0.7rem;
+  background: #132a40;
+  border: 1px solid rgba(19, 42, 64, 0.85);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.md-content pre code {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #e8f1f8;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.md-content table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 0.8em 0;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  overflow-x: auto;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(98, 128, 158, 0.18);
+}
+
+.md-content th,
+.md-content td {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(98, 128, 158, 0.14);
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-content th {
+  background: rgba(47, 107, 149, 0.1);
+  color: #173047;
+  font-weight: 700;
+}
+
+.md-content tr:nth-child(even) td {
+  background: rgba(245, 249, 252, 0.7);
+}
+
+.md-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.55rem;
+  margin: 0.5em 0;
+}
+
+/* 聊天气泡内 */
+.assistant-message .md-content-shell {
+  min-width: 0;
+}
+
+.assistant-message .md-content {
+  font-size: 0.94rem;
+  line-height: 1.7;
+}
+
+.assistant-message--assistant .md-content-toolbar__btn {
+  background: rgba(248, 251, 253, 0.96);
+}
+
+.assistant-message .md-content h1 { font-size: 1.22rem; }
+.assistant-message .md-content h2 { font-size: 1.1rem; }
+.assistant-message .md-content h3 { font-size: 1.02rem; }
+
+.assistant-message--user .md-content {
+  color: #eef6fc;
+}
+
+.assistant-message--user .md-content strong,
+.assistant-message--user .md-content h1,
+.assistant-message--user .md-content h2,
+.assistant-message--user .md-content h3,
+.assistant-message--user .md-content h4 {
+  color: #ffffff;
+}
+
+.assistant-message--user .md-content h1,
+.assistant-message--user .md-content h2 {
+  border-bottom-color: rgba(255, 255, 255, 0.22);
+}
+
+.assistant-message--user .md-content code {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #f4f9fd;
+}
+
+.assistant-message--user .md-content a {
+  color: #cfe7fb;
+}
+
+.assistant-message--user .md-content pre {
+  background: rgba(8, 24, 40, 0.45);
+  border-color: rgba(255, 255, 255, 0.12);
+}

@@ -12,6 +12,8 @@ Run this gate when a change touches files/packages such as:
 - `src/main/java/com/dong/ddrag/assistant/memory/**`
 - `src/main/java/com/dong/ddrag/assistant/agent/**` when Agent request context changes
 - `src/main/java/com/dong/ddrag/assistant/model/**` when runtime-memory state, request, or response fields change
+- `src/main/java/com/dong/ddrag/assistant/service/AssistantModelSelectionService.java`
+- `src/main/java/com/dong/ddrag/modelplatform/**` when Assistant model admission, instruction injection, or invocation governance changes
 
 Run this gate when a change affects behavior such as:
 
@@ -20,6 +22,7 @@ Run this gate when a change affects behavior such as:
 - Whether the main Assistant Agent is called during confirmation-question turns.
 - The order of runtime memory, compact summary, and session memory injected into model context.
 - Persistence of runtime memory state through the session context update path.
+- Compatibility between model selection/instruction injection and the Assistant runtime-memory or `KB_SEARCH` path.
 
 ## Required Command
 

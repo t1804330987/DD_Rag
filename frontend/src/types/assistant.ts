@@ -15,6 +15,9 @@ export interface AssistantSessionListItem {
   sessionId: number
   title: string
   lastMessageAt: string | null
+  currentModelConnectionId: number | null
+  currentModelId: number | null
+  currentInstructionProfileId: number | null
 }
 
 export interface AssistantSessionDetail {
@@ -23,6 +26,18 @@ export interface AssistantSessionDetail {
   status: string
   lastMessageAt: string | null
   createdAt: string
+  currentModelConnectionId: number | null
+  currentModelId: number | null
+  currentInstructionProfileId: number | null
+}
+
+export interface AssistantAvailableModel {
+  connectionId: number
+  modelId: number
+  providerType: string
+  connectionName: string
+  modelName: string
+  ownerType: 'PLATFORM' | 'USER'
 }
 
 export interface AssistantMessageItem {
@@ -41,10 +56,14 @@ export interface AssistantConversationContext {
 }
 
 export interface AssistantChatPayload {
-  sessionId: number
+  sessionId: number | null
   message: string
   toolMode: AssistantToolMode
   groupId?: number | null
+  requestId: string
+  modelConnectionId?: number | null
+  modelId?: number | null
+  instructionProfileId?: number | null
 }
 
 export interface AssistantChatResult {

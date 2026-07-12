@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { AssistantSessionListItem } from '../../types/assistant'
 
 const props = defineProps<{
@@ -10,6 +10,8 @@ const props = defineProps<{
   editingSessionId: number | null
   renamingSessionId: number | null
   deletingSessionId: number | null
+  drawerOpen: boolean
+  interactionDisabled: boolean
 }>()
 
 const emit = defineEmits<{
@@ -19,9 +21,16 @@ const emit = defineEmits<{
   rename: [sessionId: number, title: string]
   cancelRename: []
   remove: [sessionId: number]
+  close: []
 }>()
 
 const editingTitle = ref('')
+const query = ref('')
+const filteredSessions = computed(() => {
+  const normalized = query.value.trim().toLowerCase()
+  if (!normalized) return props.sessions
+  return props.sessions.filter((session) => session.title.toLowerCase().includes(normalized))
+})
 
 watch(
   () => props.editingSessionId,
@@ -80,24 +89,37 @@ function triggerDelete(event: MouseEvent, sessionId: number) {
 </script>
 
 <template>
-  <section class="assistant-page__column assistant-page__column--sessions">
+  <section
+    class="assistant-page__column assistant-page__column--sessions"
+    :class="{ 'is-drawer-open': drawerOpen }"
+    aria-label="会话列表"
+  >
     <div class="panel__header">
       <div>
-        <p class="panel__eyebrow">会话列表</p>
-        <h2>你的聊天记录</h2>
+        <p class="panel__eyebrow">会话</p>
+        <h2>历史记录</h2>
       </div>
-      <button class="primary-button" type="button" @click="emit('create')">新建会话</button>
+      <div class="assistant-session-column__header-actions">
+        <RouterLink class="ghost-button assistant-session-column__settings" to="/ai-settings">设置</RouterLink>
+        <button class="primary-button" type="button" :disabled="interactionDisabled" @click="emit('create')">新建</button>
+        <button class="ghost-button assistant-session-column__close" type="button" @click="emit('close')">关闭</button>
+      </div>
     </div>
 
+    <label class="assistant-session-column__search">
+      <span class="visually-hidden">搜索会话</span>
+      <input v-model="query" type="search" placeholder="搜索标题" :disabled="interactionDisabled" />
+    </label>
+
     <p v-if="error" class="feedback feedback--error">{{ error }}</p>
-    <p v-else-if="isLoading" class="placeholder-text">正在同步会话列表...</p>
+    <p v-else-if="isLoading" class="placeholder-text">正在加载会话…</p>
     <p v-else-if="sessions.length === 0" class="placeholder-text">
-      这里会保留你的最近会话。现在还没有任何记录，先创建一个新会话开始。
+      还没有会话。点击「新建」，或直接在右侧发送第一条消息。
     </p>
 
-    <div v-else class="assistant-session-list">
+    <div v-else-if="filteredSessions.length > 0" class="assistant-session-list">
       <article
-        v-for="session in sessions"
+        v-for="session in filteredSessions"
         :key="session.sessionId"
         class="assistant-session-card"
         :class="{ 'is-active': selectedSessionId === session.sessionId }"
@@ -108,6 +130,7 @@ function triggerDelete(event: MouseEvent, sessionId: number) {
             v-model="editingTitle"
             class="assistant-session-card__title-input"
             maxlength="255"
+            :disabled="interactionDisabled"
             @click.stop
             @keydown.enter.prevent="submitRename($event, session.sessionId)"
             @keydown.esc.prevent="cancelRename($event)"
@@ -119,7 +142,7 @@ function triggerDelete(event: MouseEvent, sessionId: number) {
             <button
               class="assistant-session-card__action ghost-button"
               type="button"
-              :disabled="renamingSessionId === session.sessionId"
+              :disabled="interactionDisabled || renamingSessionId === session.sessionId"
               @click="startRename($event, session)"
             >
               {{ renamingSessionId === session.sessionId ? '保存中...' : '重命名' }}
@@ -127,18 +150,19 @@ function triggerDelete(event: MouseEvent, sessionId: number) {
             <button
               class="assistant-session-card__action ghost-button ghost-button--danger"
               type="button"
-              :disabled="deletingSessionId === session.sessionId"
+              :disabled="interactionDisabled || deletingSessionId === session.sessionId"
               @click="triggerDelete($event, session.sessionId)"
             >
               {{ deletingSessionId === session.sessionId ? '删除中...' : '删除' }}
             </button>
           </div>
         </div>
-        <button class="assistant-session-card__main" type="button" @click="emit('select', session.sessionId)">
+        <button class="assistant-session-card__main" type="button" :disabled="interactionDisabled" @click="emit('select', session.sessionId)">
           <span>会话 #{{ session.sessionId }}</span>
           <small>{{ formatTime(session.lastMessageAt) }}</small>
         </button>
       </article>
     </div>
+    <p v-else class="placeholder-text">没有匹配的会话。</p>
   </section>
 </template>

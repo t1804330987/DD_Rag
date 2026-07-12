@@ -127,10 +127,8 @@ class GroupQueryControllerTest {
 
     @Test
     void shouldRejectAdminWhenQueryingBusinessGroups() throws Exception {
-        insertUser(9001L, "admin", "系统管理员", SystemRole.ADMIN);
-
         mockMvc.perform(get("/api/groups/my")
-                        .header(HttpHeaders.AUTHORIZATION, bearerToken(9001L, "admin", SystemRole.ADMIN)))
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(devAdminId(), "admin", SystemRole.ADMIN)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("系统管理员不能访问普通业务区"));
@@ -238,6 +236,14 @@ class GroupQueryControllerTest {
                         systemRole,
                         false
                 )
+        );
+    }
+
+    private long devAdminId() {
+        return jdbcTemplate.queryForObject(
+                "select id from users where user_code = ?",
+                Long.class,
+                "admin"
         );
     }
 

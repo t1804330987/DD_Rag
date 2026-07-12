@@ -2,9 +2,6 @@ server:
   port: 8080
 
 spring:
-  autoconfigure:
-    exclude:
-      - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeEmbeddingAutoConfiguration
   datasource:
     url: jdbc:postgresql://localhost:5433/dd_rag
     username: root
@@ -13,13 +10,7 @@ spring:
     enabled: true
   ai:
     model:
-      chat: dashscope
       embedding: ollama
-    dashscope:
-      api-key: ${DASHSCOPE_API_KEY:}
-      chat:
-        options:
-          model: glm-5
     ollama:
       base-url: http://localhost:11434
       embedding:
@@ -65,6 +56,21 @@ elasticsearch:
   index-name: dd_rag_document_chunks
 
 ddrag:
+  model-runtime:
+    assistant:
+      max-active-turns: ${DD_RAG_MODEL_ASSISTANT_MAX_ACTIVE_TURNS:50}
+    invocation:
+      global-limit: ${DD_RAG_MODEL_INVOCATION_GLOBAL_LIMIT:50}
+      per-user-limit: ${DD_RAG_MODEL_INVOCATION_PER_USER_LIMIT:2}
+      default-connection-limit: ${DD_RAG_MODEL_INVOCATION_DEFAULT_CONNECTION_LIMIT:50}
+    stream:
+      executor-threads: ${DD_RAG_MODEL_STREAM_EXECUTOR_THREADS:50}
+      queue-capacity: 0
+    timeout:
+      first-token: ${DD_RAG_MODEL_FIRST_TOKEN_TIMEOUT:60s}
+      idle: ${DD_RAG_MODEL_IDLE_TIMEOUT:45s}
+      business-total: ${DD_RAG_MODEL_BUSINESS_TOTAL_TIMEOUT:5m}
+      transport-hard: ${DD_RAG_MODEL_TRANSPORT_HARD_TIMEOUT:6m}
   auth:
     issuer: dd-rag
     access-token-expire-minutes: 30

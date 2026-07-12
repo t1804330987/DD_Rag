@@ -23,7 +23,7 @@ function handleSelect(selection: WorkspaceSelection) {
   <aside class="workspace-sidebar">
     <section id="groups-sidebar-invitation" class="workspace-sidebar__section workspace-sidebar__section--pending">
       <div class="workspace-sidebar__header">
-        <div>
+        <div class="workspace-sidebar__heading">
           <p class="workspace-sidebar__eyebrow">待处理</p>
           <h3>待处理邀请</h3>
         </div>
@@ -51,7 +51,7 @@ function handleSelect(selection: WorkspaceSelection) {
 
     <section id="groups-sidebar-owned" class="workspace-sidebar__section">
       <div class="workspace-sidebar__header">
-        <div>
+        <div class="workspace-sidebar__heading">
           <p class="workspace-sidebar__eyebrow">我拥有的组</p>
           <h3>我拥有的组</h3>
         </div>
@@ -86,7 +86,7 @@ function handleSelect(selection: WorkspaceSelection) {
 
     <section id="groups-sidebar-joined" class="workspace-sidebar__section">
       <div class="workspace-sidebar__header">
-        <div>
+        <div class="workspace-sidebar__heading">
           <p class="workspace-sidebar__eyebrow">我加入的组</p>
           <h3>我加入的组</h3>
         </div>
@@ -126,77 +126,113 @@ function handleSelect(selection: WorkspaceSelection) {
 <style scoped>
 .workspace-sidebar {
   display: grid;
-  gap: 1rem;
-  max-height: calc(100vh - 7rem);
+  gap: 0.85rem;
+  max-height: calc(100dvh - 5.5rem);
+  overflow-x: hidden;
   overflow-y: auto;
-  padding-right: 0.2rem;
+  padding: 0.95rem;
+  border: 1px solid rgba(16, 42, 59, 0.1);
+  border-radius: 0.8rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(243, 249, 252, 0.94));
+  box-shadow: 0 12px 28px rgba(13, 40, 58, 0.06);
 }
 
 .workspace-sidebar__section {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.7rem;
+  min-width: 0;
 }
 
 .workspace-sidebar__section--pending {
-  padding-bottom: 0.2rem;
-  border-bottom: 1px dashed rgba(25, 90, 118, 0.18);
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(25, 90, 118, 0.12);
 }
 
 .workspace-sidebar__header {
   display: flex;
   justify-content: space-between;
-  gap: 0.8rem;
-  align-items: center;
+  gap: 0.65rem;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.workspace-sidebar__heading {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .workspace-sidebar__eyebrow {
-  margin: 0 0 0.22rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #6b7280;
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  text-transform: none;
+  color: #5f7686;
+  overflow: visible;
+  white-space: normal;
 }
 
 .workspace-sidebar__header h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.98rem;
+  line-height: 1.35;
   color: #102a3b;
+  overflow-wrap: anywhere;
 }
 
 .workspace-sidebar__count {
-  padding: 0.3rem 0.62rem;
-  border-radius: 999px;
-  background: rgba(16, 42, 59, 0.06);
-  font-size: 0.78rem;
-  color: #4f6472;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.7rem;
+  min-height: 1.55rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.45rem;
+  background: rgba(16, 42, 59, 0.07);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #355466;
 }
 
 .workspace-sidebar__list {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .workspace-item {
   position: relative;
   display: grid;
-  gap: 0.3rem;
+  gap: 0.32rem;
   width: 100%;
-  padding: 0.9rem 0.95rem 0.9rem 1.1rem;
+  min-width: 0;
+  padding: 0.78rem 0.82rem 0.78rem 0.95rem;
   border: 1px solid rgba(16, 42, 59, 0.08);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.88);
   text-align: left;
   color: #102a3b;
+  overflow: visible;
   transition:
-    transform 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .workspace-item::before {
   content: '';
   position: absolute;
-  inset: 0 auto 0 0;
+  top: 0.55rem;
+  bottom: 0.55rem;
+  left: 0;
   width: 3px;
   border-radius: 999px;
   background: transparent;
@@ -204,13 +240,13 @@ function handleSelect(selection: WorkspaceSelection) {
 
 .workspace-item:hover {
   transform: translateY(-1px);
-  border-color: rgba(25, 90, 118, 0.22);
+  border-color: rgba(25, 90, 118, 0.2);
 }
 
 .workspace-item.is-selected {
-  border-color: rgba(25, 90, 118, 0.28);
-  background: linear-gradient(145deg, rgba(243, 250, 255, 0.98), rgba(228, 241, 247, 0.96));
-  box-shadow: 0 18px 34px rgba(16, 42, 59, 0.1);
+  border-color: rgba(25, 90, 118, 0.26);
+  background: linear-gradient(145deg, rgba(243, 250, 255, 0.98), rgba(232, 243, 249, 0.96));
+  box-shadow: 0 10px 22px rgba(16, 42, 59, 0.08);
 }
 
 .workspace-item.is-selected::before {
@@ -218,57 +254,80 @@ function handleSelect(selection: WorkspaceSelection) {
 }
 
 .workspace-item--pending {
-  padding-left: 0.95rem;
-  background: linear-gradient(145deg, rgba(255, 249, 242, 0.96), rgba(255, 240, 229, 0.92));
+  background: linear-gradient(145deg, rgba(255, 249, 242, 0.98), rgba(255, 243, 234, 0.94));
 }
 
 .workspace-item--pending.is-selected::before {
-  background: #cc6a3a;
+  background: #c05f30;
 }
 
 .workspace-item__title-row {
   display: flex;
   justify-content: space-between;
-  gap: 0.6rem;
-  align-items: center;
+  gap: 0.5rem;
+  align-items: flex-start;
+  min-width: 0;
 }
 
 .workspace-item strong {
-  font-size: 0.96rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .workspace-item p {
   margin: 0;
   color: #607684;
   line-height: 1.5;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
 }
 
 .workspace-item__code {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-item__badge,
+.workspace-item__role {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  padding: 0.12rem 0.42rem;
+  border-radius: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
   white-space: nowrap;
 }
 
 .workspace-item__actions {
   display: flex;
   justify-content: flex-start;
-  margin-top: 0.25rem;
+  margin-top: 0.2rem;
 }
 
 .workspace-item__action-button {
   border: 1px solid rgba(25, 90, 118, 0.16);
-  border-radius: 999px;
+  border-radius: 0.45rem;
   background: rgba(25, 90, 118, 0.1);
   color: #195a76;
-  padding: 0.45rem 0.9rem;
-  font-size: 0.8rem;
+  padding: 0.38rem 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
+  line-height: 1.3;
   cursor: pointer;
   transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease;
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
 }
 
 .workspace-item__action-button:hover {
@@ -286,16 +345,6 @@ function handleSelect(selection: WorkspaceSelection) {
 .workspace-item__action-button--member:hover {
   background: rgba(60, 96, 141, 0.12);
   border-color: rgba(60, 96, 141, 0.22);
-}
-
-.workspace-item__badge,
-.workspace-item__role {
-  flex-shrink: 0;
-  padding: 0.18rem 0.46rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
 }
 
 .workspace-item__badge {
@@ -316,15 +365,19 @@ function handleSelect(selection: WorkspaceSelection) {
 .workspace-sidebar__empty,
 .workspace-sidebar__hint {
   margin: 0;
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px dashed rgba(16, 42, 59, 0.12);
+  background: rgba(248, 251, 253, 0.9);
   color: #607684;
-  line-height: 1.6;
+  font-size: 0.84rem;
+  line-height: 1.5;
 }
 
 @media (max-width: 1080px) {
   .workspace-sidebar {
     max-height: none;
     overflow: visible;
-    padding-right: 0;
   }
 }
 </style>

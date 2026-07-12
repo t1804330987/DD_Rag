@@ -11,6 +11,12 @@ import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import com.dong.ddrag.modelplatform.model.enums.ModelScenario;
+import com.dong.ddrag.modelplatform.runtime.GovernedChatModel;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationContext;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationDispatcher;
+import com.dong.ddrag.modelplatform.runtime.ModelRuntimeService;
+import java.util.UUID;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,24 +29,34 @@ public class QueryPlanningService {
     private static final Logger log = LoggerFactory.getLogger(QueryPlanningService.class);
     private static final int MAX_QUERY_COUNT = 3;
 
-    private final ChatClient queryPlanningChatClient;
     private final PromptTemplate queryPlanningUserPromptTemplate;
+    private final ModelRuntimeService modelRuntimeService;
+    private final ModelInvocationDispatcher invocationDispatcher;
 
     public QueryPlanningService(
-            @Qualifier("queryPlanningChatClient") ChatClient queryPlanningChatClient,
-            @Qualifier("queryPlanningUserPromptTemplate") PromptTemplate queryPlanningUserPromptTemplate
+            @Qualifier("queryPlanningUserPromptTemplate") PromptTemplate queryPlanningUserPromptTemplate,
+            ModelRuntimeService modelRuntimeService,
+            ModelInvocationDispatcher invocationDispatcher
     ) {
-        this.queryPlanningChatClient = queryPlanningChatClient;
         this.queryPlanningUserPromptTemplate = queryPlanningUserPromptTemplate;
+        this.modelRuntimeService = modelRuntimeService;
+        this.invocationDispatcher = invocationDispatcher;
     }
 
     public QueryPlanResult plan(String question) {
+        return plan(null, question);
+    }
+
+    public QueryPlanResult plan(Long userId, String question) {
         String normalizedQuestion = requireQuestion(question);
+        if (userId == null || userId <= 0) {
+            return QueryPlanResult.fallback(normalizedQuestion);
+        }
         try {
 
             Prompt planPrompt = queryPlanningUserPromptTemplate.create(Map.of("question", normalizedQuestion));
 
-            QueryPlanResult rawResult = queryPlanningChatClient.prompt(planPrompt)
+            QueryPlanResult rawResult = chatClient(userId).prompt(planPrompt)
 //                    .user(user -> user.text(renderUserPrompt(normalizedQuestion)))
                     .call()
                     .entity(QueryPlanResult.class);
@@ -49,6 +65,12 @@ public class QueryPlanningService {
             log.warn("Query planning failed, fallback to direct query. question={}", normalizedQuestion, exception);
             return QueryPlanResult.fallback(normalizedQuestion);
         }
+    }
+
+    private ChatClient chatClient(Long userId) {
+        ModelInvocationContext context = modelRuntimeService.resolveScenario(userId, ModelScenario.QUERY_PLANNING,
+                new ModelRuntimeService.InvocationCorrelation(UUID.randomUUID().toString(), null, null, null));
+        return ChatClient.builder(new GovernedChatModel(context, invocationDispatcher)).build();
     }
 
     private QueryPlanResult validatePlan(QueryPlanResult rawResult, String originalQuestion) {

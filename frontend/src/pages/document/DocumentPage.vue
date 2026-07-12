@@ -94,38 +94,38 @@ const currentContextKey = computed(
 )
 const pageHeroDescription = computed(() =>
   currentGroup.value === null
-    ? '先锁定知识库空间，再按文件名、状态和时间窗口读取当前结果。'
-    : `当前聚焦「${currentGroup.value.groupName}」，主区优先展示筛选结果与异常文件。`,
+    ? '选择知识库后，可上传文件、查看索引状态，并筛选异常文档。'
+    : `当前知识库：${currentGroup.value.groupName}。可上传、筛选、预览与重试失败文件。`,
 )
 const groupScopeSummary = computed(() => {
   if (currentGroup.value === null) {
-    return `当前登录用户拥有 ${appStore.ownedGroups.length} 个 OWNER 空间，加入 ${appStore.joinedGroups.length} 个 MEMBER 空间。`
+    return `你拥有 ${appStore.ownedGroups.length} 个组，加入 ${appStore.joinedGroups.length} 个组。`
   }
 
-  return `当前空间 ID #${currentGroup.value.groupId}，所属关系为 ${formatGroupRelationLabel(currentGroup.value.relation)}。`
+  return `组 #${currentGroup.value.groupId} · ${formatGroupRelationLabel(currentGroup.value.relation)}`
 })
 const filterHint = computed(() => {
   if (currentGroup.value === null) {
-    return '请先选择知识库空间，再对当前组内文件做筛选。'
+    return '先选择知识库，再筛选文件。'
   }
 
-  return '当前可按文件名、状态与上传时间窗口收窄结果。'
+  return '可按文件名、状态、上传时间筛选。'
 })
 const resultsSummary = computed(() => {
   if (documents.value.length === visibleDocuments.value.length) {
-    return `当前共展示 ${visibleDocuments.value.length} 个文件。`
+    return `共 ${visibleDocuments.value.length} 个文件。`
   }
 
-  return `服务端返回 ${documents.value.length} 个文件，当前筛选命中 ${visibleDocuments.value.length} 个。`
+  return `共 ${documents.value.length} 个文件，当前命中 ${visibleDocuments.value.length} 个。`
 })
 const emptyStateMessage = computed(() => {
   if (documents.value.length === 0) {
     return canManageCurrentGroup.value
-      ? '当前组还没有文件，可先上传一个样例文件。'
+      ? '当前组还没有文件，可先上传一个样例。'
       : '当前组还没有可查看的文件。'
   }
 
-  return '没有匹配当前筛选条件的文件。'
+  return '没有符合当前筛选条件的文件。'
 })
 
 watch(
@@ -591,7 +591,7 @@ const uploadStageText = computed(() => {
 
     <template #main>
       <main class="documents-page">
-        <PageHeaderHero eyebrow="文档中心" title="文件管理" :description="pageHeroDescription">
+        <PageHeaderHero eyebrow="文档" title="文档中心" :description="pageHeroDescription">
         </PageHeaderHero>
 
         <div class="documents-page__feedback">
@@ -640,12 +640,12 @@ const uploadStageText = computed(() => {
         <article class="panel panel--wide documents-page__results">
           <div class="panel__header">
             <div>
-              <p class="panel__eyebrow">筛选面板</p>
-              <h2>筛选与结果</h2>
+              <p class="panel__eyebrow">结果</p>
+              <h2>文件列表</h2>
             </div>
             <div class="documents-page__results-actions">
               <span v-if="hasPendingDocuments" class="document-auto-refresh-hint">
-                {{ isPollingDocuments ? '自动刷新中...' : '检测到处理中内容，4 秒后自动刷新' }}
+                {{ isPollingDocuments ? '自动刷新中…' : '有处理中文件，约 4 秒后自动刷新' }}
               </span>
               <button
                 type="button"
@@ -653,20 +653,20 @@ const uploadStageText = computed(() => {
                 :disabled="!canLoadDocuments || isLoading || isPollingDocuments"
                 @click="handleRefreshDocuments"
               >
-                {{ isLoading ? '刷新中...' : '刷新列表' }}
+                {{ isLoading ? '刷新中…' : '刷新' }}
               </button>
-              <span class="panel__pill">{{ currentGroup ? currentGroup.groupName : '未选择知识库' }}</span>
+              <span class="panel__pill">{{ currentGroup ? currentGroup.groupName : '未选择' }}</span>
             </div>
           </div>
 
           <form class="document-filter-form" @submit.prevent="handleApplyFilters">
             <label class="document-filter-form__field">
-              <span>上传时间从</span>
+              <span>上传起</span>
               <input v-model="filters.uploadedFrom" type="date" />
             </label>
 
             <label class="document-filter-form__field">
-              <span>上传时间到</span>
+              <span>上传止</span>
               <input v-model="filters.uploadedTo" type="date" />
             </label>
 
@@ -678,15 +678,15 @@ const uploadStageText = computed(() => {
               <div class="document-filter-form__buttons">
                 <button type="button" class="ghost-button" @click="handleResetFilters">重置</button>
                 <button type="submit" class="primary-button" :disabled="isLoading || !canLoadDocuments">
-                  {{ isLoading ? '筛选中...' : '应用筛选' }}
+                  {{ isLoading ? '筛选中…' : '应用' }}
                 </button>
               </div>
             </div>
           </form>
 
-          <p v-if="appStore.isGroupsLoading" class="placeholder-text">正在同步当前登录用户的群组上下文...</p>
-          <p v-else-if="currentGroup === null" class="placeholder-text">请先选择知识库空间。</p>
-          <p v-else-if="isLoading" class="placeholder-text">正在同步当前组的文件状态...</p>
+          <p v-if="appStore.isGroupsLoading" class="placeholder-text">正在同步可用知识库…</p>
+          <p v-else-if="currentGroup === null" class="placeholder-text">请先选择知识库。</p>
+          <p v-else-if="isLoading" class="placeholder-text">正在加载文件列表…</p>
           <p v-else-if="visibleDocuments.length === 0" class="placeholder-text">{{ emptyStateMessage }}</p>
 
           <div v-else class="document-table-wrap">

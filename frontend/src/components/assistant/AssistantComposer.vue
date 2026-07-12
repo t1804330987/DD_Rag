@@ -43,6 +43,7 @@ function handleTextareaKeydown(event: KeyboardEvent, canSend: boolean, isSending
         class="assistant-composer__mode-tab"
         :class="{ 'is-active': props.toolMode === 'CHAT' }"
         type="button"
+        :disabled="props.isSending"
         @click="emit('update:toolMode', 'CHAT')"
       >
         仅对话
@@ -51,6 +52,7 @@ function handleTextareaKeydown(event: KeyboardEvent, canSend: boolean, isSending
         class="assistant-composer__mode-tab"
         :class="{ 'is-active': props.toolMode === 'KB_SEARCH' }"
         type="button"
+        :disabled="props.isSending"
         @click="emit('update:toolMode', 'KB_SEARCH')"
       >
         知识库检索
@@ -62,6 +64,7 @@ function handleTextareaKeydown(event: KeyboardEvent, canSend: boolean, isSending
         <span>知识库空间</span>
         <select
           :value="props.selectedGroupId ?? ''"
+          :disabled="props.isSending"
           @change="emit('update:groupId', Number(($event.target as HTMLSelectElement).value) || null)"
         >
           <option value="">请选择组</option>
@@ -94,7 +97,8 @@ function handleTextareaKeydown(event: KeyboardEvent, canSend: boolean, isSending
         :value="props.draft"
         rows="3"
         maxlength="4000"
-        placeholder="可以直接连续追问。若切换到知识库检索模式，请先选择要检索的组。"
+        placeholder="输入问题，Enter 发送，Shift+Enter 换行"
+        :disabled="props.isSending"
         @input="emit('update:draft', ($event.target as HTMLTextAreaElement).value)"
         @keydown="handleTextareaKeydown($event, props.canSend, props.isSending)"
       />
@@ -102,14 +106,23 @@ function handleTextareaKeydown(event: KeyboardEvent, canSend: boolean, isSending
 
     <div class="assistant-composer__footer">
       <p>
-        {{ props.toolMode === 'CHAT' ? '当前是仅对话模式，不绑定知识库。' : '当前会在所选知识库空间内调用检索链路。' }}
+        {{
+          props.toolMode === 'CHAT'
+            ? '对话模式：自由多轮交流，不检索知识库。'
+            : '检索模式：仅在所选知识库内作答，并尽量附带引用。'
+        }}
       </p>
       <div class="assistant-composer__actions">
-        <button class="primary-button" type="button" :disabled="!props.canSend || props.isSending" @click="emit('submit')">
-          {{ props.isSending ? '发送中...' : '发送消息' }}
+        <button
+          v-if="props.isStreaming"
+          class="ghost-button ghost-button--danger"
+          type="button"
+          @click="emit('stop')"
+        >
+          停止
         </button>
-        <button v-if="props.isStreaming" class="ghost-button" type="button" @click="emit('stop')">
-          停止生成
+        <button class="primary-button" type="button" :disabled="!props.canSend || props.isSending" @click="emit('submit')">
+          {{ props.isSending ? '生成中…' : '发送' }}
         </button>
       </div>
     </div>

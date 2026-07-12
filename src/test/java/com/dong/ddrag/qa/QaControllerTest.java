@@ -3,6 +3,13 @@ package com.dong.ddrag.qa;
 import com.dong.ddrag.auth.security.JwtAccessTokenService;
 import com.dong.ddrag.common.enums.SystemRole;
 import com.dong.ddrag.ingestion.service.DocumentIngestionProcessor;
+import com.dong.ddrag.modelplatform.model.enums.ConnectionOwnerType;
+import com.dong.ddrag.modelplatform.model.enums.ModelScenario;
+import com.dong.ddrag.modelplatform.model.enums.ProviderType;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationContext;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationDispatcher;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationExecutor;
+import com.dong.ddrag.modelplatform.runtime.ModelRuntimeService;
 import com.dong.ddrag.qa.model.EvidenceLevel;
 import com.dong.ddrag.qa.model.KnowledgeAnswerOutput;
 import com.dong.ddrag.qa.rag.EvidenceRetriever;
@@ -13,9 +20,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.mockito.Answers;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
@@ -75,8 +83,11 @@ class QaControllerTest {
     @MockBean
     private PgVectorStore pgVectorStore;
 
-    @MockBean(name = "qaChatClient", answer = Answers.RETURNS_DEEP_STUBS)
-    private ChatClient qaChatClient;
+    @MockBean
+    private ModelRuntimeService modelRuntimeService;
+
+    @MockBean
+    private ModelInvocationExecutor modelInvocationDispatcher;
 
     @MockBean
     private EvidenceRetriever evidenceRetriever;
@@ -104,6 +115,8 @@ class QaControllerTest {
         jdbcTemplate.update("delete from document_chunks");
         jdbcTemplate.update("delete from documents");
         given(pgVectorStore.similaritySearch(any(SearchRequest.class))).willReturn(List.of());
+        given(modelRuntimeService.resolveScenario(any(Long.class), org.mockito.ArgumentMatchers.eq(ModelScenario.QA_ANSWER), any()))
+                .willAnswer(invocation -> modelContext(invocation.getArgument(0)));
     }
 
     @Test
@@ -119,7 +132,7 @@ class QaControllerTest {
 
     @Test
     void shouldAllowMemberToAskWithinReadableGroup() throws Exception {
-        given(evidenceRetriever.retrieve(2001L, "产品迭代周期多久？"))
+        given(evidenceRetriever.retrieve(1002L, 2001L, "产品迭代周期多久？"))
                 .willReturn(RetrievedEvidenceBundle.empty());
 
         mockMvc.perform(post("/api/qa/ask")
@@ -130,7 +143,7 @@ class QaControllerTest {
                 .andExpect(jsonPath("$.answered").value(false))
                 .andExpect(jsonPath("$.reasonCode").value("INSUFFICIENT_EVIDENCE"));
 
-        verifyNoInteractions(qaChatClient);
+        verifyNoInteractions(modelInvocationDispatcher);
     }
 
     @Test
@@ -148,7 +161,7 @@ class QaControllerTest {
 
     @Test
     void shouldReturnAnsweredFalseWhenEvidenceIsInsufficient() throws Exception {
-        given(evidenceRetriever.retrieve(2001L, "产品迭代周期多久？"))
+        given(evidenceRetriever.retrieve(1001L, 2001L, "产品迭代周期多久？"))
                 .willReturn(RetrievedEvidenceBundle.empty());
 
         mockMvc.perform(post("/api/qa/ask")
@@ -160,29 +173,19 @@ class QaControllerTest {
                 .andExpect(jsonPath("$.reasonCode").value("INSUFFICIENT_EVIDENCE"))
                 .andExpect(jsonPath("$.citations.length()").value(0));
 
-        verifyNoInteractions(qaChatClient);
+        verifyNoInteractions(modelInvocationDispatcher);
     }
 
     @Test
     void shouldReturnAnswerAndCitationsWhenEvidenceIsSufficient() throws Exception {
-        given(evidenceRetriever.retrieve(2001L, "产品团队如何安排迭代？")).willReturn(bundle(
+        given(evidenceRetriever.retrieve(1001L, 2001L, "产品团队如何安排迭代？")).willReturn(bundle(
                 EvidenceLevel.SUFFICIENT,
                 List.of(
                         retrievedDocument("E1", 3001L, 4001L, 0, 0.82D, "产品手册.md", "产品团队每两周发布一次。"),
                         retrievedDocument("E2", 3002L, 4002L, 1, 0.71D, "团队规范.md", "每个迭代结束后进行复盘。")
                 )
         ));
-        given(qaChatClient.prompt(any(Prompt.class))
-                .advisors(any(java.util.function.Consumer.class))
-                .call()
-                .entity(KnowledgeAnswerOutput.class)).willReturn(
-                        new KnowledgeAnswerOutput(
-                                true,
-                                "根据当前资料，产品团队每两周发布一次。 每个迭代结束后进行复盘。",
-                                null,
-                                null
-                        )
-                );
+        givenAnswer("根据当前资料，产品团队每两周发布一次。 每个迭代结束后进行复盘。");
         mockMvc.perform(post("/api/qa/ask")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(2001L, "产品团队如何安排迭代？"))
@@ -199,24 +202,14 @@ class QaControllerTest {
 
     @Test
     void shouldExcludeSoftDeletedDocumentsFromCitations() throws Exception {
-        given(evidenceRetriever.retrieve(2001L, "线上流程由谁维护？")).willReturn(bundle(
+        given(evidenceRetriever.retrieve(1001L, 2001L, "线上流程由谁维护？")).willReturn(bundle(
                 EvidenceLevel.SUFFICIENT,
                 List.of(
                         retrievedDocument("E1", 3001L, 4001L, 0, 0.83D, "在线文档.md", "线上流程由产品团队维护。"),
                         retrievedDocument("E2", 3003L, 4003L, 2, 0.70D, "补充说明.md", "补充说明会在周会上同步。")
                 )
         ));
-        given(qaChatClient.prompt(any(Prompt.class))
-                .advisors(any(java.util.function.Consumer.class))
-                .call()
-                .entity(KnowledgeAnswerOutput.class)).willReturn(
-                        new KnowledgeAnswerOutput(
-                                true,
-                                "线上流程由产品团队维护，补充说明会在周会上同步。",
-                                null,
-                                null
-                        )
-                );
+        givenAnswer("线上流程由产品团队维护，补充说明会在周会上同步。");
         mockMvc.perform(post("/api/qa/ask")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(2001L, "线上流程由谁维护？"))
@@ -230,24 +223,14 @@ class QaControllerTest {
 
     @Test
     void shouldExcludeNotReadyDocumentsFromCitations() throws Exception {
-        given(evidenceRetriever.retrieve(2001L, "哪些文档可以作为回答依据？")).willReturn(bundle(
+        given(evidenceRetriever.retrieve(1001L, 2001L, "哪些文档可以作为回答依据？")).willReturn(bundle(
                 EvidenceLevel.SUFFICIENT,
                 List.of(
                         retrievedDocument("E1", 3001L, 4001L, 0, 0.80D, "已就绪文档.md", "产品文档已经完成发布。"),
                         retrievedDocument("E2", 3003L, 4003L, 2, 0.65D, "边界文档.md", "边界分数证据同样可以回答。")
                 )
         ));
-        given(qaChatClient.prompt(any(Prompt.class))
-                .advisors(any(java.util.function.Consumer.class))
-                .call()
-                .entity(KnowledgeAnswerOutput.class)).willReturn(
-                        new KnowledgeAnswerOutput(
-                                true,
-                                "已就绪文档和边界分数证据都可以作为回答依据。",
-                                null,
-                                null
-                        )
-                );
+        givenAnswer("已就绪文档和边界分数证据都可以作为回答依据。");
         mockMvc.perform(post("/api/qa/ask")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(2001L, "哪些文档可以作为回答依据？"))
@@ -307,6 +290,18 @@ class QaControllerTest {
 
     private RetrievedEvidenceBundle bundle(EvidenceLevel level, List<Document> documents) {
         return new RetrievedEvidenceBundle(documents, level, "测试用证据指导");
+    }
+
+    private void givenAnswer(String answer) {
+        given(modelInvocationDispatcher.call(any(ModelInvocationContext.class), any()))
+                .willReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(
+                        "{\"answered\":true,\"answer\":\"" + answer + "\"}")))));
+    }
+
+    private ModelInvocationContext modelContext(Long userId) {
+        return new ModelInvocationContext(userId, ModelScenario.QA_ANSWER, 11L, 21L, 1L,
+                ProviderType.DASHSCOPE, "qwen-plus", "qa-test", ConnectionOwnerType.PLATFORM,
+                null, null, null, null, null);
     }
 
     private void closeDataSource() {

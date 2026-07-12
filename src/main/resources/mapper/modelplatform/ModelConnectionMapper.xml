@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dong.ddrag.modelplatform.mapper.ModelConnectionMapper">
+    <resultMap id="map" type="com.dong.ddrag.modelplatform.model.entity.ModelConnectionEntity">
+        <id property="id" column="id"/><result property="providerType" column="provider_type"/><result property="ownerType" column="owner_type"/>
+        <result property="ownerUserId" column="owner_user_id"/><result property="name" column="name"/><result property="baseUrl" column="base_url"/>
+        <result property="apiKeyPlaintext" column="api_key_plaintext"/><result property="credentialStorageType" column="credential_storage_type"/>
+        <result property="credentialVersion" column="credential_version"/><result property="maskedKeySuffix" column="masked_key_suffix"/>
+        <result property="providerOptionsJson" column="provider_options_json"/><result property="maxConcurrency" column="max_concurrency"/>
+        <result property="status" column="status"/><result property="configVersion" column="config_version"/>
+        <result property="lastConnectionTestStatus" column="last_connection_test_status"/><result property="lastConnectionTestAt" column="last_connection_test_at"/>
+        <result property="deletedAt" column="deleted_at"/><result property="createdAt" column="created_at"/><result property="updatedAt" column="updated_at"/>
+    </resultMap>
+    <sql id="columns">id, provider_type, owner_type, owner_user_id, name, base_url, api_key_plaintext, credential_storage_type,
+        credential_version, masked_key_suffix, provider_options_json::text as provider_options_json, max_concurrency, status,
+        config_version, last_connection_test_status, last_connection_test_at, deleted_at, created_at, updated_at</sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        insert into model_connections(provider_type, owner_type, owner_user_id, name, base_url, api_key_plaintext,
+            credential_storage_type, credential_version, masked_key_suffix, provider_options_json, max_concurrency, status,
+            config_version, last_connection_test_status, last_connection_test_at, deleted_at, created_at, updated_at)
+        values(#{providerType}, #{ownerType}, #{ownerUserId}, #{name}, #{baseUrl}, #{apiKeyPlaintext}, #{credentialStorageType},
+            #{credentialVersion}, #{maskedKeySuffix}, cast(#{providerOptionsJson} as jsonb), #{maxConcurrency}, #{status},
+            #{configVersion}, #{lastConnectionTestStatus}, #{lastConnectionTestAt}, #{deletedAt}, #{createdAt}, #{updatedAt})
+    </insert>
+    <select id="selectOwnedById" resultMap="map">
+        select <include refid="columns"/> from model_connections
+        where id=#{connectionId} and owner_type=#{ownerType} and status&lt;&gt;'DELETED'
+        <choose><when test="ownerUserId != null">and owner_user_id=#{ownerUserId}</when><otherwise>and owner_user_id is null</otherwise></choose>
+    </select>
+    <select id="selectFormalById" resultMap="map">select <include refid="columns"/> from model_connections where id=#{connectionId} and status='ACTIVE' and deleted_at is null</select>
+    <select id="selectPlatformByIdForUpdate" resultMap="map">
+        select <include refid="columns"/> from model_connections
+        where id=#{connectionId} and owner_type='PLATFORM' and status&lt;&gt;'DELETED' and deleted_at is null
+        for update
+    </select>
+    <select id="selectByOwner" resultMap="map">
+        select <include refid="columns"/> from model_connections
+        where owner_type=#{ownerType} and status=#{status} and deleted_at is null
+        <choose><when test="ownerUserId != null">and owner_user_id=#{ownerUserId}</when><otherwise>and owner_user_id is null</otherwise></choose>
+        order by id
+    </select>
+    <select id="selectAllByOwner" resultMap="map">
+        select <include refid="columns"/> from model_connections
+        where owner_type=#{ownerType} and status&lt;&gt;'DELETED'
+        <choose><when test="ownerUserId != null">and owner_user_id=#{ownerUserId}</when><otherwise>and owner_user_id is null</otherwise></choose>
+        order by id
+    </select>
+    <update id="updateOwnedConfig">
+        update model_connections set provider_type=#{entity.providerType}, name=#{entity.name}, base_url=#{entity.baseUrl},
+            api_key_plaintext=#{entity.apiKeyPlaintext}, masked_key_suffix=#{entity.maskedKeySuffix},
+            provider_options_json=cast(#{entity.providerOptionsJson} as jsonb), max_concurrency=#{entity.maxConcurrency},
+            credential_version=#{entity.credentialVersion}, config_version=#{entity.configVersion}, status=#{entity.status},
+            last_connection_test_status=#{entity.lastConnectionTestStatus}, last_connection_test_at=null,
+            updated_at=#{entity.updatedAt}
+        where id=#{entity.id} and owner_type=#{entity.ownerType} and config_version=#{expectedConfigVersion}
+            and status=#{expectedStatus} and deleted_at is null
+        <choose><when test="entity.ownerUserId != null">and owner_user_id=#{entity.ownerUserId}</when><otherwise>and owner_user_id is null</otherwise></choose>
+    </update>
+    <update id="updateOwnedStatus">
+        update model_connections set status=#{newStatus}, updated_at=#{updatedAt}
+        where id=#{connectionId} and owner_type=#{ownerType} and status=#{expectedStatus}
+            and config_version=#{expectedConfigVersion} and deleted_at is null
+        <choose><when test="ownerUserId != null">and owner_user_id=#{ownerUserId}</when><otherwise>and owner_user_id is null</otherwise></choose>
+    </update>
+    <update id="completeConnectionTestCas">
+        update model_connections set last_connection_test_status=#{testStatus}, last_connection_test_at=#{testedAt},
+            status=#{connectionStatus}, updated_at=#{testedAt}
+        where id=#{connectionId} and config_version=#{configVersion} and status not in ('DISABLED','DELETED')
+    </update>
+    <update id="softDeleteOwned">
+        update model_connections
+        set api_key_plaintext=null, status='DELETED', deleted_at=#{deletedAt}, updated_at=#{deletedAt}
+        where id=#{connectionId} and owner_type=#{ownerType} and status&lt;&gt;'DELETED'
+        <choose><when test="ownerUserId != null">and owner_user_id=#{ownerUserId}</when><otherwise>and owner_user_id is null</otherwise></choose>
+    </update>
+</mapper>

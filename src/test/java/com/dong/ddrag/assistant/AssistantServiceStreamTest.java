@@ -12,6 +12,8 @@ import com.dong.ddrag.assistant.service.AssistantConversationService;
 import com.dong.ddrag.assistant.service.AssistantService;
 import com.dong.ddrag.groupmembership.service.GroupMembershipService;
 import com.dong.ddrag.identity.service.CurrentUserService;
+import com.dong.ddrag.common.exception.BusinessException;
+import com.dong.ddrag.modelplatform.runtime.ModelCallCancellation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
@@ -26,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -162,6 +165,31 @@ class AssistantServiceStreamTest {
                 .containsExactly("start", "delta", "done");
         assertThat(events.get(1).delta()).isEqualTo("你是想改成方案 B 吗？");
         then(assistantAgentFacade).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void shouldNotPersistAssistantMessageAfterCancellationRequest() {
+        AssistantService assistantService = createAssistantService();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        ModelCallCancellation cancellation = new ModelCallCancellation();
+        given(currentUserService.requireBusinessUser(any(HttpServletRequest.class)))
+                .willReturn(new CurrentUserService.CurrentUser(1001L, "u1001", "测试用户"));
+        given(assistantConversationService.saveUserMessage(any(), any()))
+                .willReturn(buildMessage(3001L, "你好"));
+        givenRuntimeMemoryContinues();
+
+        assertThatThrownBy(() -> assistantService.streamChat(
+                request,
+                new AssistantChatRequest(2001L, "你好", AssistantToolMode.CHAT, null),
+                event -> { },
+                cancellation,
+                (deltaEmitter, message) -> {
+                    cancellation.request();
+                    return AssistantAgentResult.withoutCitations("迟到回复");
+                }
+        )).isInstanceOf(BusinessException.class).hasMessage("CALL_CANCELLED");
+
+        then(assistantConversationService).should(never()).saveAssistantMessage(any(), any());
     }
 
     private AssistantService createAssistantService() {

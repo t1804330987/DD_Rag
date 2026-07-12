@@ -7,6 +7,9 @@ public record AssistantSessionDetailVO(
         String title,
         String status,
         LocalDateTime lastMessageAt,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        Long currentModelConnectionId,
+        Long currentModelId,
+        Long currentInstructionProfileId
 ) {
 }

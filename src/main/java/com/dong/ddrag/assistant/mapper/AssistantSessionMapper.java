@@ -31,6 +31,26 @@ public interface AssistantSessionMapper {
             @Param("lastMessageAt") java.time.LocalDateTime lastMessageAt
     );
 
+    int updateCurrentInstructionProfile(
+            @Param("sessionId") Long sessionId,
+            @Param("userId") Long userId,
+            @Param("instructionProfileId") Long instructionProfileId,
+            @Param("updatedAt") java.time.LocalDateTime updatedAt
+    );
+
+    int updateCurrentModel(
+            @Param("sessionId") Long sessionId,
+            @Param("userId") Long userId,
+            @Param("connectionId") Long connectionId,
+            @Param("modelId") Long modelId,
+            @Param("updatedAt") java.time.LocalDateTime updatedAt
+    );
+
+    int clearCurrentInstructionProfile(
+            @Param("userId") Long userId,
+            @Param("instructionProfileId") Long instructionProfileId
+    );
+
     int deleteByIdAndUserId(
             @Param("sessionId") Long sessionId,
             @Param("userId") Long userId

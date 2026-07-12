@@ -15,11 +15,18 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import com.dong.ddrag.modelplatform.model.enums.ModelScenario;
+import com.dong.ddrag.modelplatform.runtime.GovernedChatModel;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationContext;
+import com.dong.ddrag.modelplatform.runtime.ModelInvocationDispatcher;
+import com.dong.ddrag.modelplatform.runtime.ModelRuntimeService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class QaChatService {
@@ -30,33 +37,42 @@ public class QaChatService {
     private static final String FORMAT_ERROR_CODE = "ANSWER_FORMAT_ERROR";
     private static final String FORMAT_ERROR_MESSAGE = "模型返回格式错误，无法解析回答。";
 
-    private final ChatClient qaChatClient;
+    private final PromptTemplate qaSystemPromptTemplate;
+    private final RetrievalAugmentationAdvisor qaRetrievalAdvisor;
     private final PromptTemplate qaUserPromptTemplate;
     private final EvidenceRetriever evidenceRetriever;
     private final QaAnswerParser answerParser;
     private final CitationAssembler citationAssembler;
+    private final ModelRuntimeService modelRuntimeService;
+    private final ModelInvocationDispatcher invocationDispatcher;
 
     public QaChatService(
-            ChatClient qaChatClient,
+            @Qualifier("qaSystemPromptTemplate") PromptTemplate qaSystemPromptTemplate,
+            @Qualifier("qaRetrievalAdvisor") RetrievalAugmentationAdvisor qaRetrievalAdvisor,
             @Qualifier("qaUserPromptTemplate") PromptTemplate qaUserPromptTemplate,
             EvidenceRetriever evidenceRetriever,
             QaAnswerParser answerParser,
-            CitationAssembler citationAssembler
+            CitationAssembler citationAssembler,
+            ModelRuntimeService modelRuntimeService,
+            ModelInvocationDispatcher invocationDispatcher
     ) {
-        this.qaChatClient = qaChatClient;
+        this.qaSystemPromptTemplate = qaSystemPromptTemplate;
+        this.qaRetrievalAdvisor = qaRetrievalAdvisor;
         this.qaUserPromptTemplate = qaUserPromptTemplate;
         this.evidenceRetriever = evidenceRetriever;
         this.answerParser = answerParser;
         this.citationAssembler = citationAssembler;
+        this.modelRuntimeService = modelRuntimeService;
+        this.invocationDispatcher = invocationDispatcher;
     }
 
-    public AskQuestionResponse ask(Long groupId, String question) {
-        RetrievedEvidenceBundle evidenceBundle = evidenceRetriever.retrieve(groupId, question);
+    public AskQuestionResponse ask(Long userId, Long groupId, String question) {
+        RetrievedEvidenceBundle evidenceBundle = evidenceRetriever.retrieve(userId, groupId, question);
         List<Document> documents = evidenceBundle.documents();
         if (documents.isEmpty()) {
             return AskQuestionResponse.unanswered(INSUFFICIENT_CODE, INSUFFICIENT_MESSAGE, List.of());
         }
-        KnowledgeAnswerOutput output = getStructuredAnswer(groupId, question, evidenceBundle);
+        KnowledgeAnswerOutput output = getStructuredAnswer(userId, groupId, question, evidenceBundle);
         if (output == null) {
             return AskQuestionResponse.unanswered(FORMAT_ERROR_CODE, FORMAT_ERROR_MESSAGE, List.of());
         }
@@ -69,14 +85,19 @@ public class QaChatService {
         );
     }
 
+    public AskQuestionResponse ask(Long groupId, String question) {
+        throw new IllegalStateException("QA 调用必须提供实际用户上下文");
+    }
+
     private KnowledgeAnswerOutput getStructuredAnswer(
+            Long userId,
             Long groupId,
             String question,
             RetrievedEvidenceBundle evidenceBundle
     ) {
         Prompt userPrompt = createUserPrompt(question, evidenceBundle);
         try {
-            return qaChatClient.prompt(userPrompt)
+            return chatClient(userId).prompt(userPrompt)
                     .advisors(advisor -> advisor
                             .param("groupId", groupId)
                             .param(
@@ -92,18 +113,19 @@ public class QaChatService {
                     evidenceBundle.documents().size(),
                     exception
             );
-            return parseFallbackAnswer(groupId, question, evidenceBundle);
+            return parseFallbackAnswer(userId, groupId, question, evidenceBundle);
         }
     }
 
     private KnowledgeAnswerOutput parseFallbackAnswer(
+            Long userId,
             Long groupId,
             String question,
             RetrievedEvidenceBundle evidenceBundle
     ) {
         Prompt userPrompt = createUserPrompt(question, evidenceBundle);
         try {
-            String rawAnswer = qaChatClient.prompt(userPrompt)
+            String rawAnswer = chatClient(userId).prompt(userPrompt)
                     .advisors(advisor -> advisor
                             .param("groupId", groupId)
                             .param(
@@ -128,6 +150,15 @@ public class QaChatService {
             );
             return null;
         }
+    }
+
+    private ChatClient chatClient(Long userId) {
+        ModelInvocationContext context = modelRuntimeService.resolveScenario(userId, ModelScenario.QA_ANSWER,
+                new ModelRuntimeService.InvocationCorrelation(UUID.randomUUID().toString(), null, null, null));
+        return ChatClient.builder(new GovernedChatModel(context, invocationDispatcher))
+                .defaultSystem(qaSystemPromptTemplate.getTemplate())
+                .defaultAdvisors(qaRetrievalAdvisor)
+                .build();
     }
 
     private Prompt createUserPrompt(String question, RetrievedEvidenceBundle evidenceBundle) {
