@@ -231,8 +231,6 @@ DD_Rag
 
 ## 阅读路线
 
-- `docs/V6.1/V6_1_REQUIREMENTS_SPEC.md`：V6.1 功能边界与验收标准。
-- `docs/V6.1/V6_1_MODEL_PLATFORM_DESIGN.md`：模型平台运行时架构。
 - `docs/PROJECT_READING_GUIDE.md`：项目代码阅读路线。
 - `harness/modules/`：核心业务闭环的 Harness 约束与测试入口。
 
