@@ -9,8 +9,12 @@ import {
   fetchPlatformGrants,
   fetchScenarioRoute,
   bindScenarioRoute,
+  mergePlatformManualModels,
+  refreshPlatformConnectionModels,
   replacePlatformGrants,
+  setPlatformModelEnabled,
   testPlatformConnection,
+  testPlatformModel,
   updatePlatformConnection,
   updatePlatformConnectionStatus,
   type AdminUsageFilter,
@@ -30,6 +34,9 @@ interface ConnectionForm {
 const scenarios = ['ASSISTANT_CHAT', 'QA_ANSWER', 'QUERY_PLANNING', 'SESSION_SUMMARY', 'RUNTIME_MEMORY_EXTRACTION']
 const connections = ref<ModelConnection[]>([])
 const modelsByConnectionId = ref<Record<number, ModelCatalogItem[]>>({})
+const expandedModels = ref<Record<number, boolean>>({})
+const manualModels = ref<Record<number, string>>({})
+const activeModelActionKey = ref('')
 const isLoadingConnections = ref(false)
 const isSavingConnection = ref(false)
 const activeConnectionId = ref<number | null>(null)
@@ -175,8 +182,77 @@ async function changeConnectionStatus(connection: ModelConnection) {
 async function testConnection(connection: ModelConnection) {
   await runConnectionAction(connection, async () => {
     const result = await testPlatformConnection(connection.id)
-    pageFeedback.value = result.errorCode ? `连接测试状态：${result.status}（${result.errorCode}）` : `连接测试状态：${result.status}`
+    pageFeedback.value = result.errorCode
+      ? `连接测试状态：${result.status}（${result.errorCode}）`
+      : `连接测试状态：${result.status}。若服务商支持发现，会写入模型目录。`
+    expandedModels.value[connection.id] = true
   }, '测试平台连接失败')
+}
+
+async function refreshModels(connection: ModelConnection) {
+  await runConnectionAction(connection, async () => {
+    const result = await refreshPlatformConnectionModels(connection.id)
+    expandedModels.value[connection.id] = true
+    if (result.success) {
+      pageFeedback.value = `已获取当前 API Key 可用的 ${result.discoveredCount} 个模型。`
+    } else {
+      pageError.value = result.errorCode ? `刷新模型失败：${result.errorCode}` : '刷新模型失败。'
+    }
+  }, '刷新平台模型列表失败')
+}
+
+async function addManualModels(connection: ModelConnection) {
+  const values = (manualModels.value[connection.id] ?? '')
+    .split(/[\n,]/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+  if (values.length === 0) {
+    pageError.value = '请至少输入一个模型名称。'
+    return
+  }
+  await runConnectionAction(connection, async () => {
+    modelsByConnectionId.value[connection.id] = await mergePlatformManualModels(connection.id, values)
+    expandedModels.value[connection.id] = true
+    manualModels.value[connection.id] = ''
+    pageFeedback.value = '模型目录已合并。新模型仍需测试通过后才能启用。'
+  }, '合并平台模型目录失败')
+}
+
+async function runModelTest(connection: ModelConnection, model: ModelCatalogItem) {
+  activeModelActionKey.value = `model-${model.id}`
+  pageError.value = ''
+  pageFeedback.value = ''
+  try {
+    const result = await testPlatformModel(connection.id, model.id)
+    expandedModels.value[connection.id] = true
+    pageFeedback.value = result.status === 'PASSED'
+      ? `「${model.modelName}」测试通过，可以启用。`
+      : (result.errorCode ? `模型测试：${result.status}（${result.errorCode}）` : `模型测试：${result.status}`)
+    await loadConnections()
+  } catch (error) {
+    pageError.value = extractApiError(error, '测试平台模型失败')
+  } finally {
+    activeModelActionKey.value = ''
+  }
+}
+
+async function toggleModelEnabled(connection: ModelConnection, model: ModelCatalogItem) {
+  activeModelActionKey.value = `enable-${model.id}`
+  pageError.value = ''
+  pageFeedback.value = ''
+  try {
+    await setPlatformModelEnabled(connection.id, model.id, !model.enabled)
+    pageFeedback.value = !model.enabled ? `已启用模型「${model.modelName}」。` : `已停用模型「${model.modelName}」。`
+    await loadConnections()
+  } catch (error) {
+    pageError.value = extractApiError(error, '更新模型启用状态失败')
+  } finally {
+    activeModelActionKey.value = ''
+  }
+}
+
+function toggleModelPanel(connectionId: number) {
+  expandedModels.value[connectionId] = !expandedModels.value[connectionId]
 }
 
 async function removeConnection(connection: ModelConnection) {
@@ -347,8 +423,84 @@ function formatDate(value: string | null) {
         <div class="admin-panel__header"><div><p class="panel__eyebrow">已配置连接</p><h2>连接状态</h2></div></div>
         <p v-if="isLoadingConnections" class="placeholder-text">正在加载平台连接...</p>
         <p v-else-if="connections.length === 0" class="placeholder-text">尚未配置平台连接。</p>
-        <div v-else class="admin-table-wrap"><table><thead><tr><th>连接</th><th>状态</th><th>测试</th><th>并发</th><th>更新时间</th><th>操作</th></tr></thead><tbody><tr v-for="connection in connections" :key="connection.id"><td><div class="admin-user-cell"><strong>{{ connection.name }}</strong><span>{{ connection.providerType }} · {{ connection.maskedApiKey ?? '未返回掩码' }}</span><small>#{{ connection.id }} · {{ connection.baseUrl ?? '服务商默认地址' }}</small></div></td><td><span class="admin-status" :data-status="connection.status === 'DISABLED' ? 'DISABLED' : 'ACTIVE'">{{ connection.status }}</span></td><td>{{ connection.connectionTestStatus }}</td><td>{{ connection.maxConcurrency ?? '平台默认' }}</td><td>{{ formatDate(connection.updatedAt) }}</td><td><div class="admin-actions"><button class="ghost-button" type="button" :disabled="activeConnectionId === connection.id" @click="beginEdit(connection)">编辑</button><button class="ghost-button" type="button" :disabled="activeConnectionId === connection.id" @click="void testConnection(connection)">{{ activeConnectionId === connection.id ? '处理中' : '测试' }}</button><button class="ghost-button" type="button" :disabled="activeConnectionId === connection.id" @click="void changeConnectionStatus(connection)">{{ connection.status === 'DISABLED' ? '重新启用' : '停用' }}</button><button class="ghost-button ghost-button--danger" type="button" :disabled="activeConnectionId === connection.id" @click="void removeConnection(connection)">删除</button></div></td></tr></tbody></table></div>
-        <p class="admin-capability-note">已加载各连接的已保存模型目录；路由绑定只接受当前通过测试且已启用的模型。</p>
+        <div v-else class="admin-connection-list">
+          <article v-for="connection in connections" :key="connection.id" class="admin-connection-card">
+            <div class="admin-connection-card__header">
+              <div class="admin-user-cell">
+                <strong>{{ connection.name }}</strong>
+                <span>{{ connection.providerType }} · {{ connection.maskedApiKey ?? '未返回掩码' }}</span>
+                <small>#{{ connection.id }} · {{ connection.baseUrl ?? '服务商默认地址' }} · 状态 {{ connection.status }} · 连接测试 {{ connection.connectionTestStatus }}</small>
+              </div>
+              <div class="admin-actions">
+                <button class="ghost-button" type="button" :disabled="activeConnectionId === connection.id" @click="beginEdit(connection)">编辑</button>
+                <button class="ghost-button" type="button" :disabled="activeConnectionId === connection.id" @click="void testConnection(connection)">{{ activeConnectionId === connection.id ? '处理中' : '测试连接' }}</button>
+                <button class="ghost-button" type="button" :disabled="activeConnectionId === connection.id" @click="void refreshModels(connection)">获取模型列表</button>
+                <button class="ghost-button" type="button" @click="toggleModelPanel(connection.id)">{{ expandedModels[connection.id] ? '收起模型' : '展开模型' }}</button>
+                <button class="ghost-button" type="button" :disabled="activeConnectionId === connection.id" @click="void changeConnectionStatus(connection)">{{ connection.status === 'DISABLED' ? '重新启用' : '停用' }}</button>
+                <button class="ghost-button ghost-button--danger" type="button" :disabled="activeConnectionId === connection.id" @click="void removeConnection(connection)">删除</button>
+              </div>
+            </div>
+
+            <div v-if="expandedModels[connection.id]" class="admin-model-panel">
+              <div class="admin-model-panel__manual">
+                <input
+                  v-model="manualModels[connection.id]"
+                  type="text"
+                  placeholder="手工追加模型名，多个用逗号分隔，例如 qwen-plus,qwen-max"
+                />
+                <button class="ghost-button" type="button" :disabled="activeConnectionId === connection.id" @click="void addManualModels(connection)">添加模型</button>
+              </div>
+              <p v-if="(modelsByConnectionId[connection.id] ?? []).length === 0" class="placeholder-text">
+                暂无模型。可点「获取模型列表」，或手工添加模型名后再「测试模型」。
+              </p>
+              <div v-else class="admin-table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>模型</th>
+                      <th>来源</th>
+                      <th>测试状态</th>
+                      <th>启用</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="model in modelsByConnectionId[connection.id]" :key="model.id">
+                      <td>{{ model.modelName }} <small>#{{ model.id }}</small></td>
+                      <td>{{ model.sourceType }}</td>
+                      <td>{{ model.testStatus }}</td>
+                      <td>{{ model.enabled ? '已启用' : '未启用' }}</td>
+                      <td>
+                        <div class="admin-actions">
+                          <button
+                            class="ghost-button"
+                            type="button"
+                            :disabled="activeModelActionKey === `model-${model.id}`"
+                            @click="void runModelTest(connection, model)"
+                          >
+                            {{ activeModelActionKey === `model-${model.id}` ? '测试中' : '测试模型' }}
+                          </button>
+                          <button
+                            class="ghost-button"
+                            type="button"
+                            :disabled="activeModelActionKey === `enable-${model.id}` || (model.testStatus !== 'PASSED' && !model.enabled)"
+                            @click="void toggleModelEnabled(connection, model)"
+                          >
+                            {{ model.enabled ? '停用' : '启用' }}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </article>
+        </div>
+        <p class="admin-capability-note">
+          流程：创建连接 → 测试连接 / 获取模型列表 → 测试模型 → 启用模型 → 配置授权与场景路由。
+          场景路由只接受「测试通过且已启用」的模型。
+        </p>
       </article>
     </div>
 
@@ -384,6 +536,12 @@ function formatDate(value: string | null) {
 <style scoped>
 .admin-model-governance-page { display: grid; gap: 1.15rem; }
 .admin-model-governance-grid { display: grid; grid-template-columns: minmax(18rem, .9fr) minmax(0, 1.5fr); gap: 1.15rem; }
+.admin-connection-list { display: grid; gap: .85rem; }
+.admin-connection-card { border: 1px solid rgba(110, 136, 161, .14); border-radius: 1rem; padding: .9rem 1rem; background: rgba(255,255,255,.72); }
+.admin-connection-card__header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
+.admin-model-panel { margin-top: .85rem; display: grid; gap: .75rem; }
+.admin-model-panel__manual { display: flex; gap: .6rem; flex-wrap: wrap; }
+.admin-model-panel__manual input { flex: 1 1 16rem; min-height: 2.5rem; border: 1px solid rgba(110, 136, 161, .16); border-radius: .8rem; padding: 0 .8rem; }
 .admin-capability-note { margin: 1rem 0 0; color: var(--admin-text-muted); line-height: 1.6; }
 .admin-checkbox-field { display: flex !important; align-items: center; gap: .6rem; }
 .admin-checkbox-field input { width: 1rem; height: 1rem; }

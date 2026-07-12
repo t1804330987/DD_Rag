@@ -51,11 +51,14 @@
     </select>
     <update id="updateOwnedConfig">
         update model_connections set provider_type=#{entity.providerType}, name=#{entity.name}, base_url=#{entity.baseUrl},
+            <if test="updateApiKey">
             api_key_plaintext=#{entity.apiKeyPlaintext,typeHandler=com.dong.ddrag.modelplatform.security.EncryptedApiKeyTypeHandler},
             masked_key_suffix=#{entity.maskedKeySuffix},
-            provider_options_json=cast(#{entity.providerOptionsJson} as jsonb), max_concurrency=#{entity.maxConcurrency},
             credential_storage_type=#{entity.credentialStorageType},
-            credential_version=#{entity.credentialVersion}, config_version=#{entity.configVersion}, status=#{entity.status},
+            credential_version=#{entity.credentialVersion},
+            </if>
+            provider_options_json=cast(#{entity.providerOptionsJson} as jsonb), max_concurrency=#{entity.maxConcurrency},
+            config_version=#{entity.configVersion}, status=#{entity.status},
             last_connection_test_status=#{entity.lastConnectionTestStatus}, last_connection_test_at=null,
             updated_at=#{entity.updatedAt}
         where id=#{entity.id} and owner_type=#{entity.ownerType} and config_version=#{expectedConfigVersion}

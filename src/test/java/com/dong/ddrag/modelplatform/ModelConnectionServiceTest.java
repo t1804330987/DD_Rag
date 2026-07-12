@@ -108,14 +108,14 @@ class ModelConnectionServiceTest {
         current.setBaseUrl("https://old.example.com");
         current.setApiKeyPlaintext("old-key");
         when(connectionMapper.selectOwnedById(11L, "USER", 1001L)).thenReturn(current);
-        when(connectionMapper.updateOwnedConfig(any(), eq(3L), eq("ACTIVE"))).thenReturn(1);
+        when(connectionMapper.updateOwnedConfig(any(), eq(3L), eq("ACTIVE"), eq(true))).thenReturn(1);
 
         service.updateUserConnection(1001L, 11L,
                 new ModelConnectionService.ConnectionCommand("OPENAI", "private", "https://new.example.com",
                         "new-key", Map.of(), null));
 
         ArgumentCaptor<ModelConnectionEntity> captor = ArgumentCaptor.forClass(ModelConnectionEntity.class);
-        verify(connectionMapper).updateOwnedConfig(captor.capture(), eq(3L), eq("ACTIVE"));
+        verify(connectionMapper).updateOwnedConfig(captor.capture(), eq(3L), eq("ACTIVE"), eq(true));
         ModelConnectionEntity updated = captor.getValue();
         assertThat(updated.getConfigVersion()).isEqualTo(4L);
         assertThat(updated.getStatus()).isEqualTo("UNVERIFIED");

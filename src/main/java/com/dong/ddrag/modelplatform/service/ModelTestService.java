@@ -46,6 +46,10 @@ public class ModelTestService {
         return refreshModels(userId, requireOwned(connectionId, "USER", userId));
     }
 
+    public CatalogRefreshOutcome refreshPlatformModels(Long actorUserId, Long connectionId) {
+        return refreshModels(actorUserId, requireOwned(connectionId, "PLATFORM", null));
+    }
+
     public TestOutcome testUserModel(Long userId, Long connectionId, Long modelId) {
         return testModel(userId, requireOwned(connectionId, "USER", userId), modelId);
     }

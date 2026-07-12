@@ -1,5 +1,6 @@
 package com.dong.ddrag.qa.service;
 
+import com.dong.ddrag.common.exception.BusinessException;
 import com.dong.ddrag.qa.model.KnowledgeAnswerOutput;
 import com.dong.ddrag.qa.model.EvidenceLevel;
 import com.dong.ddrag.qa.model.vo.AskQuestionResponse;
@@ -106,6 +107,9 @@ public class QaChatService {
                             ))
                     .call()
                     .entity(KnowledgeAnswerOutput.class);
+        } catch (BusinessException exception) {
+            // Authorization / route / model-governance failures must surface as-is.
+            throw exception;
         } catch (RuntimeException exception) {
             log.warn(
                     "QA structured output failed, fallback to raw content. groupId={}, evidenceCount={}",
@@ -141,6 +145,8 @@ public class QaChatService {
                     rawAnswer == null ? 0 : rawAnswer.length()
             );
             return answerParser.parse(rawAnswer);
+        } catch (BusinessException exception) {
+            throw exception;
         } catch (RuntimeException exception) {
             log.error(
                     "QA raw answer fallback failed. groupId={}, evidenceCount={}",

@@ -18,7 +18,8 @@ public interface ModelConnectionMapper {
             @Param("ownerUserId") Long ownerUserId);
     int updateOwnedConfig(@Param("entity") ModelConnectionEntity entity,
             @Param("expectedConfigVersion") Long expectedConfigVersion,
-            @Param("expectedStatus") String expectedStatus);
+            @Param("expectedStatus") String expectedStatus,
+            @Param("updateApiKey") boolean updateApiKey);
     int updateOwnedStatus(@Param("connectionId") Long connectionId, @Param("ownerType") String ownerType,
             @Param("ownerUserId") Long ownerUserId, @Param("expectedStatus") String expectedStatus,
             @Param("expectedConfigVersion") Long expectedConfigVersion,

@@ -1,5 +1,12 @@
 import http, { type ApiResponse } from './http'
-import type { ModelCatalogItem, ModelConnection, ModelConnectionCommand, ModelTestOutcome, ModelUsageReport } from '../types/model-platform'
+import type {
+  ModelCatalogItem,
+  ModelCatalogRefreshOutcome,
+  ModelConnection,
+  ModelConnectionCommand,
+  ModelTestOutcome,
+  ModelUsageReport,
+} from '../types/model-platform'
 
 export interface PlatformGrant {
   connectionId: number
@@ -66,6 +73,38 @@ export async function testPlatformConnection(connectionId: number): Promise<Mode
 export async function fetchPlatformConnectionModels(connectionId: number): Promise<ModelCatalogItem[]> {
   const { data } = await http.get<ApiResponse<ModelCatalogItem[]>>(`${connectionPath}/${connectionId}/models`)
   return unwrap(data, '加载平台模型目录失败')
+}
+
+export async function refreshPlatformConnectionModels(connectionId: number): Promise<ModelCatalogRefreshOutcome> {
+  const { data } = await http.post<ApiResponse<ModelCatalogRefreshOutcome>>(
+    `${connectionPath}/${connectionId}/models/refresh`,
+  )
+  return unwrap(data, '刷新平台模型列表失败')
+}
+
+export async function mergePlatformManualModels(connectionId: number, manualModels: string[]): Promise<ModelCatalogItem[]> {
+  const { data } = await http.post<ApiResponse<ModelCatalogItem[]>>(`${connectionPath}/${connectionId}/catalog`, {
+    manualModels,
+  })
+  return unwrap(data, '合并平台模型目录失败')
+}
+
+export async function testPlatformModel(connectionId: number, modelId: number): Promise<ModelTestOutcome> {
+  const { data } = await http.post<ApiResponse<ModelTestOutcome>>(
+    `${connectionPath}/${connectionId}/models/${modelId}/test`,
+  )
+  return unwrap(data, '测试平台模型失败')
+}
+
+export async function setPlatformModelEnabled(
+  connectionId: number,
+  modelId: number,
+  enabled: boolean,
+): Promise<ModelCatalogItem> {
+  const { data } = await http.patch<ApiResponse<ModelCatalogItem>>(
+    `${connectionPath}/${connectionId}/models/${modelId}/enabled/${enabled}`,
+  )
+  return unwrap(data, '更新平台模型启用状态失败')
 }
 
 export async function replacePlatformGrants(connectionId: number, command: Omit<PlatformGrant, 'connectionId'>): Promise<PlatformGrant> {

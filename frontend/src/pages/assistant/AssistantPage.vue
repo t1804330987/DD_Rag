@@ -33,6 +33,7 @@ import type {
   AssistantToolMode,
 } from '../../types/assistant'
 import type { InstructionProfile } from '../../types/model-platform'
+import { createRequestId } from '../../utils/id'
 import '../../assets/assistant-page.css'
 import '../../assets/page-shell.css'
 import { useAuthStore } from '../../stores/auth'
@@ -380,7 +381,7 @@ async function submitChat() {
       message,
       toolMode: selectedToolMode.value,
       groupId: selectedToolMode.value === 'KB_SEARCH' ? selectedGroupId.value : null,
-      requestId: crypto.randomUUID(),
+      requestId: createRequestId(),
       modelConnectionId: sessionId === null ? selectedModelConnectionId.value : null,
       modelId: sessionId === null ? selectedModelId.value : null,
       instructionProfileId: sessionId === null ? selectedInstructionProfileId.value : null,

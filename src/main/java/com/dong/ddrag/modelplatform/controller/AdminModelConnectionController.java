@@ -67,6 +67,11 @@ public class AdminModelConnectionController {
             @PathVariable Long connectionId, HttpServletRequest request) {
         return ApiResponse.success(testService.testPlatformConnection(adminId(request), connectionId));
     }
+    @PostMapping("/{connectionId}/models/refresh")
+    public ApiResponse<ModelTestService.CatalogRefreshOutcome> refreshModels(@PathVariable Long connectionId,
+                                                                             HttpServletRequest request) {
+        return ApiResponse.success(testService.refreshPlatformModels(adminId(request), connectionId));
+    }
     @PostMapping("/{connectionId}/models/{modelId}/test") public ApiResponse<ModelTestService.TestOutcome> testModel(
             @PathVariable Long connectionId, @PathVariable Long modelId, HttpServletRequest request) {
         return ApiResponse.success(testService.testPlatformModel(adminId(request), connectionId, modelId));

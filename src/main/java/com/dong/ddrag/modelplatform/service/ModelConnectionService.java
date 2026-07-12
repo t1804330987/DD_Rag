@@ -172,10 +172,11 @@ public class ModelConnectionService {
         ModelConnectionEntity current = requireOwned(connectionId, ownerType, ownerUserId);
         long expectedVersion = current.getConfigVersion();
         String expectedStatus = current.getStatus();
+        boolean updateApiKey = command.apiKey() != null && !command.apiKey().isBlank();
+        boolean apiKeyChanged = updateApiKey && !Objects.equals(current.readApiKeyPlaintext(), command.apiKey());
         boolean criticalChanged = !Objects.equals(current.getProviderType(), command.providerType())
                 || !Objects.equals(current.getBaseUrl(), command.baseUrl())
-                || (command.apiKey() != null && !command.apiKey().isBlank()
-                    && !Objects.equals(current.readApiKeyPlaintext(), command.apiKey()))
+                || apiKeyChanged
                 || !Objects.equals(readOptions(current), command.options());
         current.setName(command.name().trim());
         current.setMaxConcurrency(command.maxConcurrency());
@@ -188,10 +189,13 @@ public class ModelConnectionService {
             current.setLastConnectionTestStatus(ModelTestStatus.UNVERIFIED.name());
             current.setLastConnectionTestAt(null);
         }
-        // TypeHandler always encrypts on write; mark storage type accordingly (also upgrades legacy plaintext rows).
-        current.setCredentialStorageType("ENCRYPTED");
+        // Only rewrite api_key when the form actually submitted a new key.
+        // Leaving the field blank means "keep existing secret" and must not re-persist the decrypted value.
+        if (updateApiKey) {
+            current.setCredentialStorageType("ENCRYPTED");
+        }
         current.setUpdatedAt(LocalDateTime.now());
-        if (connectionMapper.updateOwnedConfig(current, expectedVersion, expectedStatus) != 1) {
+        if (connectionMapper.updateOwnedConfig(current, expectedVersion, expectedStatus, updateApiKey) != 1) {
             throw new BusinessException("MODEL_CONNECTION_CONCURRENTLY_MODIFIED");
         }
         if (criticalChanged) modelMapper.invalidateTests(connectionId, current.getUpdatedAt());
