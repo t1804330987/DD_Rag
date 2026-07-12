@@ -1,3 +1,3 @@
 package com.dong.ddrag.modelplatform.model.enums;
 
-public enum CredentialStorageType { PLAINTEXT }
+public enum CredentialStorageType { PLAINTEXT, ENCRYPTED }

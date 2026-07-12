@@ -68,6 +68,7 @@ class ModelConnectionServiceTest {
         ArgumentCaptor<ModelConnectionEntity> captor = ArgumentCaptor.forClass(ModelConnectionEntity.class);
         verify(connectionMapper).insert(captor.capture());
         assertThat(captor.getValue().readApiKeyPlaintext()).isEqualTo("sk-sensitive-1234");
+        assertThat(captor.getValue().getCredentialStorageType()).isEqualTo("ENCRYPTED");
         assertThat(captor.getValue().getOwnerUserId()).isEqualTo(1001L);
     }
 

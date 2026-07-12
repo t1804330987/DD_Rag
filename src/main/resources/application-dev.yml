@@ -56,6 +56,8 @@ elasticsearch:
   index-name: dd_rag_document_chunks
 
 ddrag:
+  security:
+    api-key-encryption-secret: ${DD_RAG_API_KEY_ENCRYPTION_SECRET:dd-rag-dev-api-key-encryption-secret-2026}
   model-runtime:
     assistant:
       max-active-turns: ${DD_RAG_MODEL_ASSISTANT_MAX_ACTIVE_TURNS:50}

@@ -156,7 +156,7 @@ public class ModelConnectionService {
         applyCommand(entity, command);
         entity.setOwnerType(ownerType);
         entity.setOwnerUserId(ownerUserId);
-        entity.setCredentialStorageType("PLAINTEXT");
+        entity.setCredentialStorageType("ENCRYPTED");
         entity.setCredentialVersion(1);
         entity.setConfigVersion(1L);
         entity.setStatus(ConnectionStatus.UNVERIFIED.name());
@@ -188,6 +188,8 @@ public class ModelConnectionService {
             current.setLastConnectionTestStatus(ModelTestStatus.UNVERIFIED.name());
             current.setLastConnectionTestAt(null);
         }
+        // TypeHandler always encrypts on write; mark storage type accordingly (also upgrades legacy plaintext rows).
+        current.setCredentialStorageType("ENCRYPTED");
         current.setUpdatedAt(LocalDateTime.now());
         if (connectionMapper.updateOwnedConfig(current, expectedVersion, expectedStatus) != 1) {
             throw new BusinessException("MODEL_CONNECTION_CONCURRENTLY_MODIFIED");
@@ -262,6 +264,7 @@ public class ModelConnectionService {
         if (command.apiKey() != null && !command.apiKey().isBlank()) {
             entity.setApiKeyPlaintext(command.apiKey());
             entity.setMaskedKeySuffix(suffix(command.apiKey()));
+            entity.setCredentialStorageType("ENCRYPTED");
             if (entity.getCredentialVersion() != null) entity.setCredentialVersion(entity.getCredentialVersion() + 1);
         }
         entity.setProviderOptionsJson(writeOptions(command.options()));

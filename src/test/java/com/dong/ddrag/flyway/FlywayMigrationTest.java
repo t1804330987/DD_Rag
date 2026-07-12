@@ -133,6 +133,7 @@ class FlywayMigrationTest {
         assertThat(hasColumn("assistant_instruction_profiles", "deleted_at")).isTrue();
         assertThat(hasColumn("model_connections", "credential_storage_type")).isTrue();
         assertThat(hasColumn("model_connections", "credential_version")).isTrue();
+        assertThat(hasConstraint("ck_model_connections_credential_storage")).isTrue();
         assertThat(hasColumn("model_connection_models", "hidden_at")).isTrue();
         assertThat(hasColumn("model_call_ledger", "logical_status")).isTrue();
         assertThat(hasColumn("model_call_ledger", "transport_status")).isTrue();

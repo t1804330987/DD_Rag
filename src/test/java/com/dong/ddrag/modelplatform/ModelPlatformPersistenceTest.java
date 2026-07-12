@@ -86,6 +86,7 @@ class ModelPlatformPersistenceTest {
         registry.add("spring.flyway.user", () -> DATABASE_USERNAME);
         registry.add("spring.flyway.password", () -> DATABASE_PASSWORD);
         registry.add("ddrag.auth.jwt-secret", () -> "test-model-platform-jwt-secret-32-bytes");
+        registry.add("ddrag.security.api-key-encryption-secret", () -> "test-api-key-encryption-secret-32b");
         registry.add("spring.ai.dashscope.api-key", () -> "test-dashscope-key");
     }
 
@@ -118,6 +119,15 @@ class ModelPlatformPersistenceTest {
         assertThat(new ObjectMapper().findAndRegisterModules().writeValueAsString(connection))
                 .doesNotContain(API_KEY)
                 .doesNotContain("apiKeyPlaintext");
+
+        String stored = jdbcTemplate.queryForObject(
+                "select api_key_plaintext from model_connections where id = ?", String.class, connection.getId());
+        assertThat(stored).startsWith("ENC$v1$").doesNotContain(API_KEY);
+        assertThat(jdbcTemplate.queryForObject(
+                "select credential_storage_type from model_connections where id = ?", String.class, connection.getId()))
+                .isEqualTo("ENCRYPTED");
+        ModelConnectionEntity reloaded = connectionMapper.selectFormalById(connection.getId());
+        assertThat(reloaded.readApiKeyPlaintext()).isEqualTo(API_KEY);
 
         ModelConnectionModelEntity model = testedModel(connection.getId());
         modelMapper.insert(model);
@@ -486,7 +496,7 @@ class ModelPlatformPersistenceTest {
         entity.setName("platform-openai");
         entity.setBaseUrl("https://example.invalid");
         entity.setApiKeyPlaintext(API_KEY);
-        entity.setCredentialStorageType("PLAINTEXT");
+        entity.setCredentialStorageType("ENCRYPTED");
         entity.setCredentialVersion(1);
         entity.setMaskedKeySuffix("test");
         entity.setStatus("ACTIVE");

@@ -14,6 +14,10 @@ spring:
       max-request-size: 256MB
 
 ddrag:
+  security:
+    # AES-256 master secret for encrypting model connection API keys at rest.
+    # Override in production: DD_RAG_API_KEY_ENCRYPTION_SECRET
+    api-key-encryption-secret: ${DD_RAG_API_KEY_ENCRYPTION_SECRET:dd-rag-dev-api-key-encryption-secret-2026}
   model-runtime:
     assistant:
       max-active-turns: 50
