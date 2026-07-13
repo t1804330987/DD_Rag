@@ -45,7 +45,10 @@ class ModelUsageControllerTest {
                         .param("startedAt", "2026-07-01T00:00:00")
                         .param("endedAt", "2026-08-01T00:00:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.userId").value(1001));
+                .andExpect(jsonPath("$.data.userId").value(1001))
+                .andExpect(jsonPath("$.data.records[0].startedAt").exists())
+                .andExpect(jsonPath("$.data.records[0].modelName").value("gpt-test"))
+                .andExpect(jsonPath("$.data.records[0].totalTokens").value(30));
 
         verify(queryService).queryUserUsage(eq(1001L), any());
     }
@@ -97,6 +100,8 @@ class ModelUsageControllerTest {
     private ModelUsageQueryService.UsageReport report(Long userId) {
         return new ModelUsageQueryService.UsageReport(userId, 2, 10, 20, 30, 250,
                 List.of(new ModelUsageQueryService.UsageGroup("OPENAI", "gpt-test", "ASSISTANT_CHAT",
-                        "SUCCEEDED", "TERMINATED", 2, 10, 20, 30, 250)));
+                        "SUCCEEDED", "TERMINATED", 2, 10, 20, 30, 250)),
+                List.of(new ModelUsageQueryService.UsageRecord(LocalDateTime.of(2026, 7, 13, 20, 30),
+                        "OPENAI", "gpt-test", 30L, 250L, "ASSISTANT_CHAT", "SUCCEEDED", "TERMINATED")));
     }
 }

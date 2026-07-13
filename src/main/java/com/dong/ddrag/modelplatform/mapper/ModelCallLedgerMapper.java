@@ -40,6 +40,11 @@ public interface ModelCallLedgerMapper {
             @Param("scenario") String scenario, @Param("logicalStatus") String logicalStatus,
             @Param("transportStatus") String transportStatus,
             @Param("startedAt") LocalDateTime startedAt, @Param("endedAt") LocalDateTime endedAt);
+    List<ModelCallLedgerEntity> selectUsageRecords(@Param("userId") Long userId,
+            @Param("providerType") String providerType, @Param("modelName") String modelName,
+            @Param("scenario") String scenario, @Param("logicalStatus") String logicalStatus,
+            @Param("transportStatus") String transportStatus,
+            @Param("startedAt") LocalDateTime startedAt, @Param("endedAt") LocalDateTime endedAt);
 
     class UsageAggregateRow {
         private String providerType;

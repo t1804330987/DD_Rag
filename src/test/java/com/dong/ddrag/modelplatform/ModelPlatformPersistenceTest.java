@@ -291,6 +291,11 @@ class ModelPlatformPersistenceTest {
         assertThat(aggregate.getInvocationCount()).isEqualTo(2);
         assertThat(aggregate.getTotalTokens()).isEqualTo(42);
         assertThat(aggregate.getDurationMs()).isEqualTo(180);
+        assertThat(ledgerMapper.selectUsageRecords(USER_ID, "OPENAI", "gpt-test", "ASSISTANT_CHAT",
+                "SUCCEEDED", "TERMINATED", first.getStartedAt().minusMinutes(1),
+                first.getStartedAt().plusMinutes(1)))
+                .extracting(ModelCallLedgerEntity::getInvocationId)
+                .containsExactlyInAnyOrder("invocation-cas-1", "invocation-cas-2");
         assertThat(ledgerMapper.selectForAdminUsage(USER_ID, null, null, null, null,
                 first.getStartedAt().minusMinutes(1), first.getStartedAt().plusMinutes(1)))
                 .extracting(ModelCallLedgerEntity::getInvocationId)

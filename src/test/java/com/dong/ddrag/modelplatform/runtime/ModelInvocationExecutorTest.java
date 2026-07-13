@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
@@ -23,6 +25,7 @@ import com.dong.ddrag.modelplatform.service.ModelCallLedgerService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -30,10 +33,66 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.prompt.Prompt;
 import reactor.core.publisher.Flux;
 
 class ModelInvocationExecutorTest {
+    @Test
+    void recordsTokenUsageReturnedByProvider() {
+        ModelRuntimeService runtime = mock(ModelRuntimeService.class);
+        ChatModelFactory factory = mock(ChatModelFactory.class);
+        ModelCallLedgerService ledger = mock(ModelCallLedgerService.class);
+        ModelInvocationConcurrencyGuard concurrency = new ModelInvocationConcurrencyGuard(properties());
+        ModelInvocationContext context = context();
+        ModelConnectionEntity connection = connection();
+        ModelConnectionModelEntity model = model();
+        when(runtime.requireCurrent(context)).thenReturn(new ModelRuntimeService.ResolvedModel(context, connection, model));
+        ChatModelFactory.ChatModelLease lease = mock(ChatModelFactory.ChatModelLease.class);
+        ChatModel provider = mock(ChatModel.class);
+        ChatResponse response = new ChatResponse(List.of(), ChatResponseMetadata.builder()
+                .usage(new DefaultUsage(12, 7, 19))
+                .build());
+        when(factory.acquire(connection, model)).thenReturn(lease);
+        when(lease.model()).thenReturn(provider);
+        when(provider.call(any(Prompt.class))).thenReturn(response);
+
+        ModelInvocationExecutor executor = new ModelInvocationExecutor(runtime, factory, ledger, concurrency,
+                Clock.fixed(Instant.parse("2026-07-11T00:00:00Z"), ZoneOffset.UTC));
+
+        executor.call(context, new Prompt("hello"));
+
+        verify(ledger).succeed(anyString(), eq(12L), eq(7L), eq(19L), anyLong(), isNull());
+    }
+
+    @Test
+    void recordsTokenUsageReturnedInStreamingResponse() {
+        ModelRuntimeService runtime = mock(ModelRuntimeService.class);
+        ChatModelFactory factory = mock(ChatModelFactory.class);
+        ModelCallLedgerService ledger = mock(ModelCallLedgerService.class);
+        ModelInvocationConcurrencyGuard concurrency = new ModelInvocationConcurrencyGuard(properties());
+        ModelInvocationContext context = context();
+        ModelConnectionEntity connection = connection();
+        ModelConnectionModelEntity model = model();
+        when(runtime.requireCurrent(context)).thenReturn(new ModelRuntimeService.ResolvedModel(context, connection, model));
+        ChatModelFactory.ChatModelLease lease = mock(ChatModelFactory.ChatModelLease.class);
+        ChatModel provider = mock(ChatModel.class);
+        ChatResponse response = new ChatResponse(List.of(), ChatResponseMetadata.builder()
+                .usage(new DefaultUsage(20, 9, 29))
+                .build());
+        when(factory.acquire(connection, model)).thenReturn(lease);
+        when(lease.model()).thenReturn(provider);
+        when(provider.stream(any(Prompt.class))).thenReturn(Flux.just(response));
+
+        ModelInvocationExecutor executor = new ModelInvocationExecutor(runtime, factory, ledger, concurrency,
+                Clock.fixed(Instant.parse("2026-07-11T00:00:00Z"), ZoneOffset.UTC));
+
+        executor.stream(context, new Prompt("hello")).blockLast();
+
+        verify(ledger).succeed(anyString(), eq(20L), eq(9L), eq(29L), anyLong(), isNull());
+    }
+
     @Test
     void revalidatesStartsLedgerBeforeProviderAndReleasesPermitAfterCompletion() {
         ModelRuntimeService runtime = mock(ModelRuntimeService.class);

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { fetchAdminUsers, type AdminUserItem } from '../../api/admin-user'
 import { extractApiError } from '../../api/http'
 import { useAuthStore } from '../../stores/auth'
+import { formatChinaDateTime } from '../../utils/date-time'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -43,11 +44,7 @@ function goToUsers() {
 }
 
 function formatLastLogin(value: string | null) {
-  if (!value) {
-    return '从未登录'
-  }
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString('zh-CN')
+  return formatChinaDateTime(value, '从未登录')
 }
 </script>
 

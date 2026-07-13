@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
@@ -68,7 +69,7 @@ public final class ModelInvocationExecutor implements ModelInvocationDispatcher 
         InvocationResources resources = begin(context, true);
         try {
             ChatResponse response = resources.lease.model().call(prompt);
-            succeed(resources);
+            succeed(resources, response);
             return response;
         } catch (RuntimeException exception) {
             fail(resources, exception);
@@ -90,6 +91,7 @@ public final class ModelInvocationExecutor implements ModelInvocationDispatcher 
             InvocationResources resources = begin(context, true);
             AtomicBoolean physicallyTerminated = new AtomicBoolean();
             AtomicBoolean receivedToken = new AtomicBoolean();
+            UsageAccumulator usage = new UsageAccumulator();
             AtomicReference<Subscription> subscription = new AtomicReference<>();
             Runnable cancellationListener = () -> markDetachedCancellation(resources, cancellation);
             if (cancellation != null) {
@@ -118,7 +120,10 @@ public final class ModelInvocationExecutor implements ModelInvocationDispatcher 
                     })
                     .timeout(properties.getTimeout().getFirstToken(),
                             ignored -> Mono.delay(properties.getTimeout().getIdle()))
-                    .doOnNext(response -> receivedToken.set(true))
+                    .doOnNext(response -> {
+                        receivedToken.set(true);
+                        usage.capture(response);
+                    })
                     .doOnComplete(() -> {
                         if (physicallyTerminated.compareAndSet(false, true)) {
                             if (cancellation != null && cancellation.isBusinessTimedOut()) {
@@ -126,7 +131,7 @@ public final class ModelInvocationExecutor implements ModelInvocationDispatcher 
                             } else if (cancellation != null && cancellation.isRequested()) {
                                 ledgerService.cancelled(resources.invocationId, elapsed(resources));
                             } else {
-                                succeed(resources);
+                                succeed(resources, usage);
                             }
                         }
                     })
@@ -238,7 +243,18 @@ public final class ModelInvocationExecutor implements ModelInvocationDispatcher 
     }
 
     private void succeed(InvocationResources resources) {
-        ledgerService.succeed(resources.invocationId, 0, 0, 0, elapsed(resources), null);
+        succeed(resources, new UsageAccumulator());
+    }
+
+    private void succeed(InvocationResources resources, ChatResponse response) {
+        UsageAccumulator usage = new UsageAccumulator();
+        usage.capture(response);
+        succeed(resources, usage);
+    }
+
+    private void succeed(InvocationResources resources, UsageAccumulator usage) {
+        ledgerService.succeed(resources.invocationId, usage.inputTokens, usage.outputTokens,
+                usage.totalTokens, elapsed(resources), null);
     }
 
     private void fail(InvocationResources resources, Throwable error) {
@@ -311,6 +327,26 @@ public final class ModelInvocationExecutor implements ModelInvocationDispatcher 
             };
         }
         return "PROVIDER_ERROR";
+    }
+
+    private static final class UsageAccumulator {
+        private long inputTokens;
+        private long outputTokens;
+        private long totalTokens;
+
+        private void capture(ChatResponse response) {
+            if (response == null || response.getMetadata() == null) return;
+            Usage usage = response.getMetadata().getUsage();
+            if (usage == null) return;
+            inputTokens = Math.max(inputTokens, tokenCount(usage.getPromptTokens()));
+            outputTokens = Math.max(outputTokens, tokenCount(usage.getCompletionTokens()));
+            totalTokens = Math.max(Math.max(totalTokens, tokenCount(usage.getTotalTokens())),
+                    inputTokens + outputTokens);
+        }
+
+        private static long tokenCount(Integer value) {
+            return value == null ? 0 : Math.max(0, value.longValue());
+        }
     }
 
     private final class InvocationResources implements AutoCloseable {

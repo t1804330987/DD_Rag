@@ -34,7 +34,7 @@ final class SpringAiProviderModels {
                 .build();
         return OpenAiChatModel.builder()
                 .openAiApi(api)
-                .defaultOptions(OpenAiChatOptions.builder().model(settings.modelName()).build())
+                .defaultOptions(OpenAiChatOptions.builder().model(settings.modelName()).streamUsage(true).build())
                 .retryTemplate(NO_RETRY)
                 .build();
     }

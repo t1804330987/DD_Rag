@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { AskQuestionResponse } from '../../../api/qa'
 import CitationList from '../../../components/CitationList.vue'
 import MarkdownContent from '../../../components/MarkdownContent.vue'
+import { humanizeQaRefusalMessage } from '../../../utils/model-error-message'
 
-defineProps<{
+const props = defineProps<{
   currentGroupId: number | null
   currentGroupName: string
   currentQuestion: string
@@ -12,6 +14,19 @@ defineProps<{
   isGroupsLoading: boolean
   isSubmitting: boolean
 }>()
+
+const refusalMessage = computed(() =>
+  humanizeQaRefusalMessage(props.result?.reasonCode, props.result?.reasonMessage),
+)
+
+const refusalTitle = computed(() => {
+  const code = props.result?.reasonCode
+  if (code === 'INSUFFICIENT_EVIDENCE') return '证据不足'
+  if (code === 'ANSWER_FORMAT_ERROR') return '模型输出异常'
+  if (code && code.startsWith('MODEL_')) return '模型暂不可用'
+  if (code === 'PROVIDER_ERROR' || code === 'PROVIDER_RATE_LIMITED') return '模型服务异常'
+  return '本次未能回答'
+})
 </script>
 
 <template>
@@ -61,10 +76,10 @@ defineProps<{
 
       <section v-else class="qa-refusal-card">
         <div class="qa-refusal-card__head">
-          <strong>本次拒答</strong>
-          <span>{{ result.reasonCode ?? 'NO_REASON_CODE' }}</span>
+          <strong>{{ refusalTitle }}</strong>
+          <span v-if="result.reasonCode">{{ result.reasonCode }}</span>
         </div>
-        <p>{{ result.reasonMessage ?? '当前证据不足，无法给出可靠回答。' }}</p>
+        <p>{{ refusalMessage }}</p>
       </section>
 
       <CitationList

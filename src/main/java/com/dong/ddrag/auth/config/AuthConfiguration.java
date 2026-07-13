@@ -18,7 +18,7 @@ public class AuthConfiguration {
 
     @Bean
     Clock authClock() {
-        return Clock.systemDefaultZone();
+        return Clock.systemUTC();
     }
 
     @Bean

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { askQuestion, type AskQuestionResponse } from '../../api/qa'
 import { fetchGroups } from '../../api/group'
 import { extractApiError } from '../../api/http'
+import { humanizeModelErrorMessage } from '../../utils/model-error-message'
 import PageHeaderHero from '../../components/layout/PageHeaderHero.vue'
 import WorkbenchShell from '../../components/layout/WorkbenchShell.vue'
 import WorkbenchSidebar from '../../components/layout/WorkbenchSidebar.vue'
@@ -103,7 +104,10 @@ async function handleAsk() {
   } catch (error) {
     if (!isActiveAskRequest(contextVersion, contextKey, requestId)) return
     result.value = null
-    askError.value = extractApiError(error, '问答请求失败')
+    askError.value = humanizeModelErrorMessage(
+      extractApiError(error, '问答请求失败'),
+      '问答请求失败',
+    )
   } finally {
     if (isActiveAskRequest(contextVersion, contextKey, requestId)) {
       isSubmitting.value = false

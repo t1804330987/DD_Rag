@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { fetchMyModelUsage } from '../../api/model-platform'
 import { extractApiError } from '../../api/http'
 import type { ModelUsageReport, UsageFilter } from '../../types/model-platform'
+import { formatChinaDateTime } from '../../utils/date-time'
 
 const report = ref<ModelUsageReport | null>(null)
 const isLoading = ref(false)
@@ -29,6 +30,7 @@ function cleanFilter(): UsageFilter {
 }
 
 function formatNumber(value: number) { return new Intl.NumberFormat('zh-CN').format(value) }
+function formatMetric(value: number | null, suffix = '') { return value == null ? '—' : `${formatNumber(value)}${suffix}` }
 </script>
 
 <template>
@@ -36,8 +38,8 @@ function formatNumber(value: number) { return new Intl.NumberFormat('zh-CN').for
     <div class="ai-settings-panel__head"><div><span>My Usage</span><h2>个人调用记录</h2></div><button class="ghost-button" type="button" :disabled="isLoading" @click="loadUsage">刷新</button></div>
     <form class="ai-settings-usage-filter" @submit.prevent="loadUsage"><label>Provider<input v-model="filter.providerType" placeholder="例如 OPENAI" /></label><label>模型<input v-model="filter.modelName" placeholder="模型名" /></label><label>场景<input v-model="filter.scenario" placeholder="例如 ASSISTANT" /></label><label>逻辑状态<select v-model="filter.logicalStatus"><option value="">全部</option><option value="SUCCEEDED">成功</option><option value="FAILED">失败</option><option value="CANCELLED">已取消</option></select></label><button class="primary-button" type="submit" :disabled="isLoading">筛选</button></form>
     <p v-if="error" class="feedback feedback--error">{{ error }}</p><p v-else-if="isLoading" class="placeholder-text">正在汇总当前用户的调用记录…</p>
-    <template v-else-if="report"><div class="ai-settings-usage-summary"><div><span>调用次数</span><strong>{{ formatNumber(report.invocationCount) }}</strong></div><div><span>总 Token</span><strong>{{ formatNumber(report.totalTokens) }}</strong></div><div><span>输入 / 输出</span><strong>{{ formatNumber(report.inputTokens) }} / {{ formatNumber(report.outputTokens) }}</strong></div><div><span>累计时长</span><strong>{{ formatNumber(report.durationMs) }} ms</strong></div></div>
-      <p v-if="report.groups.length === 0" class="placeholder-text">当前筛选条件下没有调用记录。</p>
-      <div v-else class="ai-settings-usage-table-wrap"><table><thead><tr><th>Provider / 模型</th><th>场景</th><th>状态</th><th>调用</th><th>Token</th><th>时长</th></tr></thead><tbody><tr v-for="group in report.groups" :key="[group.providerType, group.modelName, group.scenario, group.logicalStatus, group.transportStatus].join('-')"><td><strong>{{ group.providerType }}</strong><span>{{ group.modelName }}</span></td><td>{{ group.scenario }}</td><td><span class="ai-settings-status-pair">{{ group.logicalStatus }} / {{ group.transportStatus }}</span></td><td>{{ formatNumber(group.invocationCount) }}</td><td>{{ formatNumber(group.totalTokens) }}</td><td>{{ formatNumber(group.durationMs) }} ms</td></tr></tbody></table></div></template>
+    <template v-else-if="report"><div class="ai-settings-usage-summary"><div><span>调用次数</span><strong>{{ formatNumber(report.invocationCount) }}</strong></div><div><span>总 Token</span><strong>{{ formatNumber(report.totalTokens) }}</strong></div><div><span>输入 / 输出</span><strong>{{ formatNumber(report.inputTokens) }} / {{ formatNumber(report.outputTokens) }}</strong></div></div>
+      <p v-if="report.records.length === 0" class="placeholder-text">当前筛选条件下没有调用记录。</p>
+      <div v-else class="ai-settings-usage-table-wrap"><table><thead><tr><th>时间</th><th>模型</th><th>Tokens</th><th>耗时</th><th>场景</th><th>状态</th></tr></thead><tbody><tr v-for="(record, index) in report.records" :key="`${record.startedAt}-${record.modelName}-${index}`"><td>{{ formatChinaDateTime(record.startedAt) }}</td><td>{{ record.modelName }}</td><td>{{ formatMetric(record.totalTokens) }}</td><td>{{ formatMetric(record.durationMs, ' ms') }}</td><td>{{ record.scenario }}</td><td><span class="ai-settings-status-pair">{{ record.logicalStatus }} / {{ record.transportStatus }}</span></td></tr></tbody></table></div></template>
   </section>
 </template>

@@ -3,10 +3,21 @@ package com.dong.ddrag.modelplatform.provider;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.dong.ddrag.modelplatform.model.enums.ProviderType;
+import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.openai.OpenAiChatOptions;
 
 class OpenAiProviderAdapterTest {
+    @Test
+    void shouldRequestUsageMetadataForStreamingCalls() {
+        var model = SpringAiProviderModels.openAi(new ProviderChatModelSettings(ProviderType.OPENAI,
+                "https://openai.example/v1", "test-key", "gpt-test", Map.of(), Duration.ofSeconds(5)));
+
+        assertTrue(((OpenAiChatOptions) model.getDefaultOptions()).getStreamUsage());
+    }
+
     @Test
     void shouldAppendOpenAiV1PathWhenCustomBaseUrlIsProviderRoot() {
         var fixture = ProviderAdapterTestSupport.fixture(OpenAiChatModelProviderAdapter::new,

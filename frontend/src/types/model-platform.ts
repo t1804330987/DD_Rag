@@ -78,6 +78,17 @@ export interface ModelUsageGroup {
   durationMs: number
 }
 
+export interface ModelUsageRecord {
+  startedAt: string
+  providerType: string
+  modelName: string
+  totalTokens: number | null
+  durationMs: number | null
+  scenario: string
+  logicalStatus: string
+  transportStatus: string
+}
+
 export interface ModelUsageReport {
   userId: number
   invocationCount: number
@@ -86,6 +97,7 @@ export interface ModelUsageReport {
   totalTokens: number
   durationMs: number
   groups: ModelUsageGroup[]
+  records: ModelUsageRecord[]
 }
 
 export interface ProviderFieldSchema {

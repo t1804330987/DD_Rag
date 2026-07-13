@@ -2,6 +2,7 @@ package com.dong.ddrag.modelplatform.service;
 
 import com.dong.ddrag.modelplatform.mapper.ModelCallLedgerMapper;
 import com.dong.ddrag.modelplatform.mapper.ModelCallLedgerMapper.UsageAggregateRow;
+import com.dong.ddrag.modelplatform.model.entity.ModelCallLedgerEntity;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -44,12 +45,17 @@ public class ModelUsageQueryService {
                         filter.startedAt(), filter.endedAt()).stream()
                 .map(this::toGroup)
                 .toList();
+        List<UsageRecord> records = mapper.selectUsageRecords(userId, filter.providerType(), filter.modelName(),
+                        filter.scenario(), filter.logicalStatus(), filter.transportStatus(),
+                        filter.startedAt(), filter.endedAt()).stream()
+                .map(this::toRecord)
+                .toList();
         return new UsageReport(userId,
                 groups.stream().mapToLong(UsageGroup::invocationCount).sum(),
                 groups.stream().mapToLong(UsageGroup::inputTokens).sum(),
                 groups.stream().mapToLong(UsageGroup::outputTokens).sum(),
                 groups.stream().mapToLong(UsageGroup::totalTokens).sum(),
-                groups.stream().mapToLong(UsageGroup::durationMs).sum(), groups);
+                groups.stream().mapToLong(UsageGroup::durationMs).sum(), groups, records);
     }
 
     private UsageFilter normalize(UsageFilter filter) {
@@ -75,13 +81,22 @@ public class ModelUsageQueryService {
                 row.getTotalTokens(), row.getDurationMs());
     }
 
+    private UsageRecord toRecord(ModelCallLedgerEntity ledger) {
+        return new UsageRecord(ledger.getStartedAt(), ledger.getProviderTypeSnapshot(),
+                ledger.getModelNameSnapshot(), ledger.getTotalTokens(), ledger.getDurationMs(),
+                ledger.getScenario(), ledger.getLogicalStatus(), ledger.getTransportStatus());
+    }
+
     public record UsageFilter(Long userId, String providerType, String modelName, String scenario,
             String logicalStatus, String transportStatus, LocalDateTime startedAt, LocalDateTime endedAt) { }
 
     public record UsageReport(Long userId, long invocationCount, long inputTokens, long outputTokens,
-            long totalTokens, long durationMs, List<UsageGroup> groups) { }
+            long totalTokens, long durationMs, List<UsageGroup> groups, List<UsageRecord> records) { }
 
     public record UsageGroup(String providerType, String modelName, String scenario, String logicalStatus,
             String transportStatus, long invocationCount, long inputTokens, long outputTokens,
             long totalTokens, long durationMs) { }
+
+    public record UsageRecord(LocalDateTime startedAt, String providerType, String modelName,
+            Long totalTokens, Long durationMs, String scenario, String logicalStatus, String transportStatus) { }
 }

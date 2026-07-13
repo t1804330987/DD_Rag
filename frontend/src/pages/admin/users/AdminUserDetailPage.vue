@@ -9,6 +9,7 @@ import {
   type UserStatus,
 } from '../../../api/admin-user'
 import { extractApiError } from '../../../api/http'
+import { formatChinaDateTime } from '../../../utils/date-time'
 
 const route = useRoute()
 const router = useRouter()
@@ -58,11 +59,7 @@ async function loadUser() {
 }
 
 function formatLastLogin(value: string | null) {
-  if (!value) {
-    return '从未登录'
-  }
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString('zh-CN')
+  return formatChinaDateTime(value, '从未登录')
 }
 
 async function handleStatusChange() {

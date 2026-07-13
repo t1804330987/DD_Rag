@@ -81,4 +81,15 @@
         group by provider_type_snapshot, model_name_snapshot, scenario, logical_status, transport_status
         order by provider_type_snapshot, model_name_snapshot, scenario, logical_status, transport_status
     </select>
+    <select id="selectUsageRecords" resultMap="map">
+        select <include refid="columns"/> from model_call_ledger
+        where started_at&gt;=#{startedAt} and started_at&lt;#{endedAt}
+        <if test="userId != null">and user_id=#{userId}</if>
+        <if test="providerType != null">and provider_type_snapshot=#{providerType}</if>
+        <if test="modelName != null">and model_name_snapshot=#{modelName}</if>
+        <if test="scenario != null">and scenario=#{scenario}</if>
+        <if test="logicalStatus != null">and logical_status=#{logicalStatus}</if>
+        <if test="transportStatus != null">and transport_status=#{transportStatus}</if>
+        order by started_at desc, id desc
+    </select>
 </mapper>
